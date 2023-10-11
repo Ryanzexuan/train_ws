@@ -64,11 +64,13 @@ CMAKE_BINARY_DIR = /home/ryan/train_ws/build
 
 # The main recursive "all" target.
 all: gtest/all
+all: experiments/all
 all: model_fit/all
 .PHONY : all
 
 # The main recursive "preinstall" target.
 preinstall: gtest/preinstall
+preinstall: experiments/preinstall
 preinstall: model_fit/preinstall
 .PHONY : preinstall
 
@@ -79,8 +81,24 @@ clean: CMakeFiles/run_tests.dir/clean
 clean: CMakeFiles/clean_test_results.dir/clean
 clean: CMakeFiles/doxygen.dir/clean
 clean: gtest/clean
+clean: experiments/clean
 clean: model_fit/clean
 .PHONY : clean
+
+#=============================================================================
+# Directory level rules for directory experiments
+
+# Recursive "all" directory target.
+experiments/all:
+.PHONY : experiments/all
+
+# Recursive "preinstall" directory target.
+experiments/preinstall:
+.PHONY : experiments/preinstall
+
+# Recursive "clean" directory target.
+experiments/clean: experiments/CMakeFiles/_catkin_empty_exported_target.dir/clean
+.PHONY : experiments/clean
 
 #=============================================================================
 # Directory level rules for directory gtest
@@ -142,7 +160,7 @@ model_fit/preinstall:
 .PHONY : model_fit/preinstall
 
 # Recursive "clean" directory target.
-model_fit/clean: model_fit/CMakeFiles/_catkin_empty_exported_target.dir/clean
+model_fit/clean:
 .PHONY : model_fit/clean
 
 #=============================================================================
@@ -381,30 +399,30 @@ gtest/googletest/CMakeFiles/gtest_main.dir/clean:
 .PHONY : gtest/googletest/CMakeFiles/gtest_main.dir/clean
 
 #=============================================================================
-# Target rules for target model_fit/CMakeFiles/_catkin_empty_exported_target.dir
+# Target rules for target experiments/CMakeFiles/_catkin_empty_exported_target.dir
 
 # All Build rule for target.
-model_fit/CMakeFiles/_catkin_empty_exported_target.dir/all:
-	$(MAKE) $(MAKESILENT) -f model_fit/CMakeFiles/_catkin_empty_exported_target.dir/build.make model_fit/CMakeFiles/_catkin_empty_exported_target.dir/depend
-	$(MAKE) $(MAKESILENT) -f model_fit/CMakeFiles/_catkin_empty_exported_target.dir/build.make model_fit/CMakeFiles/_catkin_empty_exported_target.dir/build
+experiments/CMakeFiles/_catkin_empty_exported_target.dir/all:
+	$(MAKE) $(MAKESILENT) -f experiments/CMakeFiles/_catkin_empty_exported_target.dir/build.make experiments/CMakeFiles/_catkin_empty_exported_target.dir/depend
+	$(MAKE) $(MAKESILENT) -f experiments/CMakeFiles/_catkin_empty_exported_target.dir/build.make experiments/CMakeFiles/_catkin_empty_exported_target.dir/build
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ryan/train_ws/build/CMakeFiles --progress-num= "Built target _catkin_empty_exported_target"
-.PHONY : model_fit/CMakeFiles/_catkin_empty_exported_target.dir/all
+.PHONY : experiments/CMakeFiles/_catkin_empty_exported_target.dir/all
 
 # Build rule for subdir invocation for target.
-model_fit/CMakeFiles/_catkin_empty_exported_target.dir/rule: cmake_check_build_system
+experiments/CMakeFiles/_catkin_empty_exported_target.dir/rule: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ryan/train_ws/build/CMakeFiles 0
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 model_fit/CMakeFiles/_catkin_empty_exported_target.dir/all
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 experiments/CMakeFiles/_catkin_empty_exported_target.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ryan/train_ws/build/CMakeFiles 0
-.PHONY : model_fit/CMakeFiles/_catkin_empty_exported_target.dir/rule
+.PHONY : experiments/CMakeFiles/_catkin_empty_exported_target.dir/rule
 
 # Convenience name for target.
-_catkin_empty_exported_target: model_fit/CMakeFiles/_catkin_empty_exported_target.dir/rule
+_catkin_empty_exported_target: experiments/CMakeFiles/_catkin_empty_exported_target.dir/rule
 .PHONY : _catkin_empty_exported_target
 
 # clean rule for target.
-model_fit/CMakeFiles/_catkin_empty_exported_target.dir/clean:
-	$(MAKE) $(MAKESILENT) -f model_fit/CMakeFiles/_catkin_empty_exported_target.dir/build.make model_fit/CMakeFiles/_catkin_empty_exported_target.dir/clean
-.PHONY : model_fit/CMakeFiles/_catkin_empty_exported_target.dir/clean
+experiments/CMakeFiles/_catkin_empty_exported_target.dir/clean:
+	$(MAKE) $(MAKESILENT) -f experiments/CMakeFiles/_catkin_empty_exported_target.dir/build.make experiments/CMakeFiles/_catkin_empty_exported_target.dir/clean
+.PHONY : experiments/CMakeFiles/_catkin_empty_exported_target.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

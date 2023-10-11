@@ -35,7 +35,14 @@
 /home/ryan/train_ws/build/gtest/googletest/CMakeFiles/install.dir
 /home/ryan/train_ws/build/gtest/googletest/CMakeFiles/install/local.dir
 /home/ryan/train_ws/build/gtest/googletest/CMakeFiles/install/strip.dir
-/home/ryan/train_ws/build/model_fit/CMakeFiles/_catkin_empty_exported_target.dir
+/home/ryan/train_ws/build/experiments/CMakeFiles/_catkin_empty_exported_target.dir
+/home/ryan/train_ws/build/experiments/CMakeFiles/test.dir
+/home/ryan/train_ws/build/experiments/CMakeFiles/edit_cache.dir
+/home/ryan/train_ws/build/experiments/CMakeFiles/rebuild_cache.dir
+/home/ryan/train_ws/build/experiments/CMakeFiles/list_install_components.dir
+/home/ryan/train_ws/build/experiments/CMakeFiles/install.dir
+/home/ryan/train_ws/build/experiments/CMakeFiles/install/local.dir
+/home/ryan/train_ws/build/experiments/CMakeFiles/install/strip.dir
 /home/ryan/train_ws/build/model_fit/CMakeFiles/test.dir
 /home/ryan/train_ws/build/model_fit/CMakeFiles/edit_cache.dir
 /home/ryan/train_ws/build/model_fit/CMakeFiles/rebuild_cache.dir
