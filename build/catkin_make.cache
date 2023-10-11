@@ -1,0 +1,2 @@
+model_fit
+-DCATKIN_DEVEL_PREFIX=/home/ryan/train_ws/devel -DCMAKE_INSTALL_PREFIX=/home/ryan/train_ws/install -G Unix Makefiles

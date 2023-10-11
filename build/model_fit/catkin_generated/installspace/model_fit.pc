@@ -1,0 +1,8 @@
+prefix=/home/ryan/train_ws/install
+
+Name: model_fit
+Description: Description of model_fit
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

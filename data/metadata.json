@@ -1,0 +1,12 @@
+{
+    "simplified_sim_dataset": {
+        "train": {
+            "dataset_001": {
+                "noisy": true,
+                "drag": true,
+                "payload": false,
+                "motor_noise": true
+            }
+        }
+    }
+}
