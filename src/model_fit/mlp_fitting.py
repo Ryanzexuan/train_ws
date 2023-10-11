@@ -23,41 +23,32 @@ from torch.utils.data import DataLoader
 import ml_casadi.torch as mc
 
 from tqdm import tqdm
-
-from src.model_fitting.mlp_common import GPToMLPDataset, NormalizedMLP
+import sys
+sys.path.append('/home/ryan/train_ws/src')
+from model_fit.gp_common import GPDataset, read_dataset
+from model_fit.mlp_common import RawDataset, NormalizedMlp, MlpDataset
+from config.configuration_parameters import ModelFitConfig as Conf
 from src.utils.utils import safe_mkdir_recursive, load_pickled_models
 from src.utils.utils import get_model_dir_and_file
-from src.model_fitting.gp_common import GPDataset, read_dataset
-from config.configuration_parameters import ModelFitConfig as Conf
-
 
 
 def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_options, dataset_name,
          x_cap, hist_bins, hist_thresh,
          model_name="model", epochs=100, batch_size=64, hidden_layers=1, hidden_size=32, plot=False):
 
-    """
-    Reads the dataset specified and trains a GP model or ensemble on it. The regressed variables is the time-derivative
-    of one of the states.
-    The feature and regressed variables are identified through the index number in the state vector. It is defined as:
-    [0: p_x, 1: p_y, 2:, p_z, 3: q_w, 4: q_x, 5: q_y, 6: q_z, 7: v_x, 8: v_y, 9: v_z, 10: w_x, 11: w_y, 12: w_z]
-    The input vector is also indexed:
-    [0: u_0, 1: u_1, 2: u_2, 3: u_3].
+    # Get git commit hash for saving the model
+    git_version = ''
+    try:
+        git_version = subprocess.check_output(['git', 'describe', '--always']).strip().decode("utf-8")
+    except subprocess.CalledProcessError as e:
+        print(e.returncode, e.output)
+    print("The model will be saved using hash: %s" % git_version)
 
-    :param x_features: List of n regression feature indices from the quadrotor state indexing.
-    :type x_features: list
-    :param u_features: List of n' regression feature indices from the input state.
-    :type u_features: list
-    :param reg_y_dims: Indices of output dimension being regressed as the time-derivative.
-    :type reg_y_dims: List
-    :param dataset_name: Name of the dataset
-    :param quad_sim_options: Dictionary of metadata of the dataset to be read.
-    :param x_cap: cap value (in absolute value) for dataset pruning. Any input feature that exceeds this number in any
-    dimension will be removed.
-    :param hist_bins: Number of bins used for histogram pruning
-    :param hist_thresh: Any bin with less data percentage than this number will be removed.
-    :param model_name: Given name to the currently trained GP.
-    """
+    gp_name_dict = {"git": git_version, "model_name": model_name, "params": quad_sim_options}
+    save_file_path, save_file_name = get_model_dir_and_file(gp_name_dict)
+    safe_mkdir_recursive(save_file_path)
+    print(f'{gp_name_dict},{save_file_path},{save_file_name}')
+    
     # #### DATASET LOADING #### #
     if isinstance(dataset_name, str):
         df_train = read_dataset(dataset_name, True, quad_sim_options)
@@ -72,8 +63,63 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
             print('Could not find test dataset.')
     else:
         raise TypeError("dataset_name must be a string.")
-
+    # invalid = np.where( == 0)
+    # print(df_val['vel_x'])
+    raw_dataset_train = RawDataset(df_val)
+    dataset_train = MlpDataset(raw_dataset_train)
+    x_mean, x_std, y_mean, y_std = dataset_train.stats() # SMU seems useless
     
+    input_dims = 2   # inpute dimension +(~ if groud_effect else 0) or +len(x_features)
+    data_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0)
+    mlp_model = mc.nn.MultiLayerPerceptron(input_dims, hidden_size, len(reg_y_dims), hidden_layers, 'Tanh')
+    model = NormalizedMlp(mlp_model,torch.tensor(x_mean).float(), torch.tensor(x_std).float(), torch.tensor(y_mean).float(), torch.tensor(y_std).float())
+
+    cuda_name = 'cuda:0'
+    if torch.cuda.is_available():
+        model = model.to(cuda_name)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+    loss_infos = []
+    bar = tqdm(range(epochs))
+    for i in bar:
+        model.train()
+        losses = []
+        for x, y in data_loader:
+            if torch.cuda.is_available():
+                    x = x.to(cuda_name)
+                    y = y.to(cuda_name)
+            x = x.float()
+            y = y.float()
+            optimizer.zero_grad()
+            y_pred = model(x)
+            loss = torch.square(y-y_pred).mean()
+            loss.backward()
+            optimizer.step()
+
+            losses.append(loss.item())
+
+        train_loss_mean = np.mean(losses)
+        train_loss_std = np.std(losses)
+        loss_info = train_loss_mean
+        loss_infos.append(loss_info)
+        bar.set_description(f'Train Loss: {train_loss_mean:.6f}, Val Loss {loss_info:.6f}')
+        bar.refresh()
+
+    save_dict = {
+            'state_dict': model.state_dict(),
+            'input_size': input_dims,
+            'hidden_size': hidden_size,
+            'output_size': len(reg_y_dims),
+            'hidden_layers': hidden_layers
+        }
+    torch.save(save_dict, os.path.join(save_file_path, f'{save_file_name}.pt'))
+
+
+    if 1:
+        import matplotlib.pyplot as plt
+        # plt.plot(loss_infos)
+        plt.show()
 
 if __name__ == '__main__':
 
@@ -94,14 +140,14 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="",
                         help="Name assigned to the trained model.")
 
-    parser.add_argument('--x', nargs='+', type=int, default=[7],
+    parser.add_argument('--x', nargs='+', type=int, default=[2],
                         help='Regression X variables. Must be a list of integers between 0 and 12. Velocities xyz '
                              'correspond to indices 7, 8, 9.')
 
     parser.add_argument('--u', action="store_true",
                         help='Use the control as input to the model.')
 
-    parser.add_argument("--y", nargs='+', type=int, default=[7],
+    parser.add_argument("--y", nargs='+', type=int, default=[2],
                         help="Regression Y variable. Must be an integer between 0 and 12. Velocities xyz correspond to"
                              "indices 7, 8, 9.")
 
