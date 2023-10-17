@@ -19,7 +19,8 @@ class DirectoryConfig:
     Class for storing directories within the package
     """
 
-    _dir_path = os.path.dirname(os.path.realpath(__file__))
+    _dir_path = os.path.dirname(os.path.abspath(__file__))
+    # print(_dir_path)
     SAVE_DIR = _dir_path + '/../results/model_fitting'
     RESULTS_DIR = _dir_path + '/../results'
     CONFIG_DIR = _dir_path + ''

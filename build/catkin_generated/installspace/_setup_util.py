@@ -273,8 +273,8 @@ if __name__ == '__main__':
             # don't consider any other prefix path than this one
             CMAKE_PREFIX_PATH = []
         # prepend current workspace if not already part of CPP
-        base_path = os.path.dirname(__file__)
-        # CMAKE_PREFIX_PATH uses forward slash on all platforms, but __file__ is platform dependent
+        base_path = os.path.dirname()
+        # CMAKE_PREFIX_PATH uses forward slash on all platforms, but  is platform dependent
         # base_path on Windows contains backward slashes, need to be converted to forward slashes before comparison
         if os.path.sep != '/':
             base_path = base_path.replace(os.path.sep, '/')

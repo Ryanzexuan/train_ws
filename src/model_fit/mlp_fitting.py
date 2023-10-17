@@ -11,7 +11,8 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
-
+import sys
+sys.path.append('/home/ryan/train_ws/src')
 import os
 import time
 import argparse
@@ -23,8 +24,7 @@ from torch.utils.data import DataLoader
 import ml_casadi.torch as mc
 
 from tqdm import tqdm
-import sys
-sys.path.append('/home/ryan/train_ws/src')
+
 from model_fit.gp_common import GPDataset, read_dataset
 from model_fit.mlp_common import RawDataset, NormalizedMlp, MlpDataset
 from config.configuration_parameters import ModelFitConfig as Conf
@@ -46,6 +46,8 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
 
     gp_name_dict = {"git": git_version, "model_name": model_name, "params": quad_sim_options}
     save_file_path, save_file_name = get_model_dir_and_file(gp_name_dict)
+    save_file_path = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict["git"]), str(gp_name_dict["model_name"]))
+    # print(save_file_path)
     safe_mkdir_recursive(save_file_path)
     print(f'{gp_name_dict},{save_file_path},{save_file_name}')
     
@@ -69,7 +71,7 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
     dataset_train = MlpDataset(raw_dataset_train)
     x_mean, x_std, y_mean, y_std = dataset_train.stats() # SMU seems useless
     
-    input_dims = 2   # inpute dimension +(~ if groud_effect else 0) or +len(x_features)
+    input_dims = 6   # inpute dimension +(~ if groud_effect else 0) or +len(x_features)
     data_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0)
     mlp_model = mc.nn.MultiLayerPerceptron(input_dims, hidden_size, len(reg_y_dims), hidden_layers, 'Tanh')
     model = NormalizedMlp(mlp_model,torch.tensor(x_mean).float(), torch.tensor(x_std).float(), torch.tensor(y_mean).float(), torch.tensor(y_std).float())
@@ -91,6 +93,7 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
                     y = y.to(cuda_name)
             x = x.float()
             y = y.float()
+            # print(y)
             optimizer.zero_grad()
             y_pred = model(x)
             loss = torch.square(y-y_pred).mean()
@@ -114,11 +117,11 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
             'hidden_layers': hidden_layers
         }
     torch.save(save_dict, os.path.join(save_file_path, f'{save_file_name}.pt'))
-
+    print(save_dict["output_size"])
 
     if 1:
         import matplotlib.pyplot as plt
-        # plt.plot(loss_infos)
+        plt.plot(loss_infos)
         plt.show()
 
 if __name__ == '__main__':
@@ -147,7 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('--u', action="store_true",
                         help='Use the control as input to the model.')
 
-    parser.add_argument("--y", nargs='+', type=int, default=[2],
+    parser.add_argument("--y", nargs='+', type=int, default=[1,2,3],
                         help="Regression Y variable. Must be an integer between 0 and 12. Velocities xyz correspond to"
                              "indices 7, 8, 9.")
 
@@ -186,6 +189,7 @@ if __name__ == '__main__':
     histogram_pruning_threshold = Conf.histogram_threshold
     x_value_cap = Conf.velocity_cap
 
+    print(y_regressed_dims)
     main(x_feats, u_feats, y_regressed_dims, model_ground_effect, simulation_options, ds_name,
          x_value_cap, histogram_pruning_bins, histogram_pruning_threshold,
          model_name=model_name, epochs=epochs, batch_size=batch_size, hidden_layers=hidden_layers,
