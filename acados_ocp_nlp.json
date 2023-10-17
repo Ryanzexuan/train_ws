@@ -10,17 +10,21 @@
         "constr_type_e": "BGH",
         "has_x0": true,
         "idxbu": [
-            0
+            0,
+            1,
+            2
         ],
         "idxbx": [],
         "idxbx_0": [
             0,
-            1
+            1,
+            2
         ],
         "idxbx_e": [],
         "idxbxe_0": [
             0,
-            1
+            1,
+            2
         ],
         "idxsbu": [],
         "idxsbx": [],
@@ -32,10 +36,13 @@
         "idxsphi": [],
         "idxsphi_e": [],
         "lbu": [
+            -10,
+            -10,
             -10
         ],
         "lbx": [],
         "lbx_0": [
+            0.0,
             0.0,
             0.0
         ],
@@ -56,10 +63,13 @@
         "lsphi": [],
         "lsphi_e": [],
         "ubu": [
+            10,
+            10,
             10
         ],
         "ubx": [],
         "ubx_0": [
+            0.0,
             0.0,
             0.0
         ],
@@ -83,28 +93,85 @@
     "cost": {
         "Vu": [
             [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
                 0.0
             ]
         ],
         "Vu_0": [
             [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
                 0.0
             ]
         ],
         "Vx": [
             [
                 1.0,
+                0.0,
                 0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
             ]
         ],
         "Vx_0": [
             [
                 1.0,
+                0.0,
                 0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
             ]
         ],
         "Vx_e": [
             [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
                 0.0,
                 0.0
             ]
@@ -117,16 +184,52 @@
         ],
         "W": [
             [
-                1.0
+                7,
+                0,
+                0
+            ],
+            [
+                0,
+                2,
+                0
+            ],
+            [
+                0,
+                0,
+                8
             ]
         ],
         "W_0": [
             [
-                1.0
+                7,
+                0,
+                0
+            ],
+            [
+                0,
+                2,
+                0
+            ],
+            [
+                0,
+                0,
+                8
             ]
         ],
         "W_e": [
             [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
                 0.0
             ]
         ],
@@ -141,12 +244,18 @@
         "cost_type_0": "LINEAR_LS",
         "cost_type_e": "LINEAR_LS",
         "yref": [
+            0.0,
+            0.0,
             0.0
         ],
         "yref_0": [
+            0.0,
+            0.0,
             0.0
         ],
         "yref_e": [
+            0.0,
+            0.0,
             0.0
         ],
         "zl": [],
@@ -160,16 +269,16 @@
     ],
     "dims": {
         "N": 10,
-        "nbu": 1,
+        "nbu": 3,
         "nbx": 0,
-        "nbx_0": 2,
+        "nbx_0": 3,
         "nbx_e": 0,
-        "nbxe_0": 2,
+        "nbxe_0": 3,
         "ng": 0,
         "ng_e": 0,
         "nh": 0,
         "nh_e": 0,
-        "np": 8,
+        "np": 27,
         "nphi": 0,
         "nphi_e": 0,
         "nr": 0,
@@ -186,11 +295,11 @@
         "nsh_e": 0,
         "nsphi": 0,
         "nsphi_e": 0,
-        "nu": 1,
-        "nx": 2,
-        "ny": 1,
-        "ny_0": 1,
-        "ny_e": 1,
+        "nu": 3,
+        "nx": 3,
+        "ny": 3,
+        "ny_0": 3,
+        "ny_e": 3,
         "nz": 0
     },
     "json_file": "acados_ocp_nlp.json",
@@ -227,28 +336,47 @@
         "dyn_disc_fun_jac_hess": null,
         "dyn_ext_fun_type": "casadi",
         "dyn_generic_source": null,
-        "f_expl_expr": "(vertcat(s_dot, u)+(f_a+mac(df_a,(vertcat(s, s_dot)-a),zeros(2x1))))",
-        "f_impl_expr": "(vertcat(s_dot, s_dot_dot)-(vertcat(s_dot, u)+(f_a+mac(df_a,(vertcat(s, s_dot)-a),zeros(2x1)))))",
+        "f_expl_expr": "(vertcat(((u[0]*cos(state[2]))*dt), ((u[1]*sin(state[2]))*dt), (u[1]*dt))+(f_a+mac(df_a,(vertcat(state, u, dt)-a),zeros(3x1))))",
+        "f_impl_expr": "(state_dot-(vertcat(((u[0]*cos(state[2]))*dt), ((u[1]*sin(state[2]))*dt), (u[1]*dt))+(f_a+mac(df_a,(vertcat(state, u, dt)-a),zeros(3x1)))))",
         "gnsf": {
             "nontrivial_f_LO": 1,
             "purely_linear": 0
         },
         "name": "wr",
         "p": "vertcat(a, f_a, vec(df_a))",
-        "u": "u",
-        "x": "vertcat(s, s_dot)",
-        "xdot": "vertcat(s_dot, s_dot_dot)",
+        "u": "vertcat(u, dt)",
+        "x": "state",
+        "xdot": "state_dot",
         "z": "0x0"
     },
     "parameter_values": [
         0.0,
         0.0,
-        9.63404369354248,
-        8.674604415893555,
-        -2.5046567916870117,
-        -3.508023738861084,
-        16.8031063079834,
-        21.513301849365234
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.5517051219940186,
+        -0.009332060813903809,
+        0.10028064250946045,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
     ],
     "problem_class": "OCP",
     "shared_lib_ext": ".so",

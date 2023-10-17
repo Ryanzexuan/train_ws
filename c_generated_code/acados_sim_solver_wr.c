@@ -169,12 +169,9 @@ int wr_acados_sim_create(wr_sim_solver_capsule * capsule)
     /* initialize parameter values */
     double* p = calloc(np, sizeof(double));
     
-    p[2] = 9.63404369354248;
-    p[3] = 8.674604415893555;
-    p[4] = -2.5046567916870117;
-    p[5] = -3.508023738861084;
-    p[6] = 16.8031063079834;
-    p[7] = 21.51330184936523;
+    p[6] = 0.5517051219940186;
+    p[7] = -0.009332060813903809;
+    p[8] = 0.10028064250946044;
 
     wr_acados_sim_update_params(capsule, p, np);
     free(p);
@@ -182,8 +179,8 @@ int wr_acados_sim_create(wr_sim_solver_capsule * capsule)
 
     /* initialize input */
     // x
-    double x0[2];
-    for (int ii = 0; ii < 2; ii++)
+    double x0[3];
+    for (int ii = 0; ii < 3; ii++)
         x0[ii] = 0.0;
 
     sim_in_set(wr_sim_config, wr_sim_dims,
@@ -191,19 +188,19 @@ int wr_acados_sim_create(wr_sim_solver_capsule * capsule)
 
 
     // u
-    double u0[1];
-    for (int ii = 0; ii < 1; ii++)
+    double u0[3];
+    for (int ii = 0; ii < 3; ii++)
         u0[ii] = 0.0;
 
     sim_in_set(wr_sim_config, wr_sim_dims,
                wr_sim_in, "u", u0);
 
     // S_forw
-    double S_forw[6];
-    for (int ii = 0; ii < 6; ii++)
+    double S_forw[18];
+    for (int ii = 0; ii < 18; ii++)
         S_forw[ii] = 0.0;
-    for (int ii = 0; ii < 2; ii++)
-        S_forw[ii + ii * 2 ] = 1.0;
+    for (int ii = 0; ii < 3; ii++)
+        S_forw[ii + ii * 3 ] = 1.0;
 
 
     sim_in_set(wr_sim_config, wr_sim_dims,

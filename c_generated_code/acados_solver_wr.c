@@ -221,7 +221,7 @@ ocp_nlp_dims* wr_acados_create_2_create_and_set_dimensions(wr_solver_capsule* ca
     nbx[0]  = NBX0;
     nsbx[0] = 0;
     ns[0] = NS - NSBX;
-    nbxe[0] = 2;
+    nbxe[0] = 3;
     ny[0] = NY0;
 
     // terminal - common
@@ -298,7 +298,7 @@ void wr_acados_create_3_create_and_set_functions(wr_solver_capsule* capsule)
         capsule->__CAPSULE_FNC__.casadi_sparsity_in = & __MODEL_BASE_FNC__ ## _sparsity_in; \
         capsule->__CAPSULE_FNC__.casadi_sparsity_out = & __MODEL_BASE_FNC__ ## _sparsity_out; \
         capsule->__CAPSULE_FNC__.casadi_work = & __MODEL_BASE_FNC__ ## _work; \
-        external_function_param_casadi_create(&capsule->__CAPSULE_FNC__ , 8); \
+        external_function_param_casadi_create(&capsule->__CAPSULE_FNC__ , 27); \
     }while(false)
 
 
@@ -328,12 +328,9 @@ void wr_acados_create_4_set_default_parameters(wr_solver_capsule* capsule) {
     const int N = capsule->nlp_solver_plan->N;
     // initialize parameters to nominal value
     double* p = calloc(NP, sizeof(double));
-    p[2] = 9.63404369354248;
-    p[3] = 8.674604415893555;
-    p[4] = -2.5046567916870117;
-    p[5] = -3.508023738861084;
-    p[6] = 16.8031063079834;
-    p[7] = 21.51330184936523;
+    p[6] = 0.5517051219940186;
+    p[7] = -0.009332060813903809;
+    p[8] = 0.10028064250946044;
 
     for (int i = 0; i <= N; i++) {
         wr_acados_update_params(capsule, i, p, NP);
@@ -399,12 +396,16 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     free(yref_e);
    double* W_0 = calloc(NY0*NY0, sizeof(double));
     // change only the non-zero elements:
-    W_0[0+(NY0) * 0] = 1;
+    W_0[0+(NY0) * 0] = 7;
+    W_0[1+(NY0) * 1] = 2;
+    W_0[2+(NY0) * 2] = 8;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, 0, "W", W_0);
     free(W_0);
     double* W = calloc(NY*NY, sizeof(double));
     // change only the non-zero elements:
-    W[0+(NY) * 0] = 1;
+    W[0+(NY) * 0] = 7;
+    W[1+(NY) * 1] = 2;
+    W[2+(NY) * 2] = 8;
 
     for (int i = 1; i < N; i++)
     {
@@ -418,6 +419,8 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     double* Vx_0 = calloc(NY0*NX, sizeof(double));
     // change only the non-zero elements:
     Vx_0[0+(NY0) * 0] = 1;
+    Vx_0[1+(NY0) * 1] = 1;
+    Vx_0[2+(NY0) * 2] = 1;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, 0, "Vx", Vx_0);
     free(Vx_0);
     double* Vu_0 = calloc(NY0*NU, sizeof(double));
@@ -427,6 +430,8 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     double* Vx = calloc(NY*NX, sizeof(double));
     // change only the non-zero elements:
     Vx[0+(NY) * 0] = 1;
+    Vx[1+(NY) * 1] = 1;
+    Vx[2+(NY) * 2] = 1;
     for (int i = 1; i < N; i++)
     {
         ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "Vx", Vx);
@@ -458,6 +463,7 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     int* idxbx0 = malloc(NBX0 * sizeof(int));
     idxbx0[0] = 0;
     idxbx0[1] = 1;
+    idxbx0[2] = 2;
 
     double* lubx0 = calloc(2*NBX0, sizeof(double));
     double* lbx0 = lubx0;
@@ -470,10 +476,11 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     free(idxbx0);
     free(lubx0);
     // idxbxe_0
-    int* idxbxe_0 = malloc(2 * sizeof(int));
+    int* idxbxe_0 = malloc(3 * sizeof(int));
     
     idxbxe_0[0] = 0;
     idxbxe_0[1] = 1;
+    idxbxe_0[2] = 2;
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "idxbxe", idxbxe_0);
     free(idxbxe_0);
 
@@ -482,12 +489,18 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     int* idxbu = malloc(NBU * sizeof(int));
     
     idxbu[0] = 0;
+    idxbu[1] = 1;
+    idxbu[2] = 2;
     double* lubu = calloc(2*NBU, sizeof(double));
     double* lbu = lubu;
     double* ubu = lubu + NBU;
     
     lbu[0] = -10;
     ubu[0] = 10;
+    lbu[1] = -10;
+    ubu[1] = 10;
+    lbu[2] = -10;
+    ubu[2] = 10;
 
     for (int i = 0; i < N; i++)
     {
@@ -758,7 +771,7 @@ int wr_acados_update_params(wr_solver_capsule* capsule, int stage, double *p, in
 {
     int solver_status = 0;
 
-    int casadi_np = 8;
+    int casadi_np = 27;
     if (casadi_np != np) {
         printf("acados_update_params: trying to set %i parameters for external functions."
             " External function has %i parameters. Exiting.\n", np, casadi_np);
@@ -800,7 +813,7 @@ int wr_acados_update_params_sparse(wr_solver_capsule * capsule, int stage, int *
 {
     int solver_status = 0;
 
-    int casadi_np = 8;
+    int casadi_np = 27;
     if (casadi_np < n_update) {
         printf("wr_acados_update_params_sparse: trying to set %d parameters for external functions."
             " External function has %d parameters. Exiting.\n", n_update, casadi_np);

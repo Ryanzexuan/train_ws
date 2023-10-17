@@ -34,10 +34,10 @@
 #include "acados_c/sim_interface.h"
 #include "acados_c/external_function_interface.h"
 
-#define WR_NX     2
+#define WR_NX     3
 #define WR_NZ     0
-#define WR_NU     1
-#define WR_NP     8
+#define WR_NU     3
+#define WR_NP     27
 
 #ifdef __cplusplus
 extern "C" {
