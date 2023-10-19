@@ -332,7 +332,11 @@ def read_dataset(name, train_split, sim_options):
     #     rec_file = os.path.join(rec_file_dir, rec_file_name)
     #     ds = np.load(rec_file)
     # else:
+<<<<<<< HEAD
     rec_file = "/home/ryan/train_ws/data/simplified_sim_dataset/train/dataset_002.csv"
+=======
+    rec_file = "/home/ryan/train_ws/data/simplified_sim_dataset/train/dataset_001.csv"
+>>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
     ds = pd.read_csv(rec_file)
 
     return ds

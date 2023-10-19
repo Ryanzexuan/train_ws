@@ -11,8 +11,12 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
+<<<<<<< HEAD
 import sys
 sys.path.append('/home/ryan/train_ws/src')
+=======
+
+>>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
 import time
 import json
 import argparse

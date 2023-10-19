@@ -10,9 +10,12 @@ FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 """
+<<<<<<< HEAD
 
 import sys
 sys.path.append('/home/ryan/train_ws/src')
+=======
+>>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
 import os.path
 import time
 import argparse
@@ -21,7 +24,11 @@ import torch
 import ml_casadi.torch as mc
 
 from config.configuration_parameters import SimpleSimConfig
+<<<<<<< HEAD
 from src.model_fit.mlp_common import NormalizedMLP
+=======
+from src.model_fitting.mlp_common import NormalizedMLP
+>>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
 from src.quad_mpc.quad_3d_mpc import Quad3DMPC
 from src.quad_mpc.quad_3d import Quadrotor3D
 from src.utils.quad_3d_opt_utils import get_reference_chunk
