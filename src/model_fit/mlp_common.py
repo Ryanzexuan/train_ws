@@ -1,5 +1,6 @@
 import numpy as np
 import sys
+import casadi as cs
 from torch.utils.data import Dataset
 
 import ml_casadi.torch as mc
@@ -24,6 +25,15 @@ class RawDataset(Dataset):
         self.state_pose_x_output = None
         self.state_pose_y_output = None
         self.state_orientation_y_output = None
+        # nomial state == ref state
+        self.nomial_x = None
+        self.nomial_y = None
+        self.nomial_yaw =  None
+        # residuals
+        self.res_x = None
+        self.res_y =  None
+        self.res_yaw = None
+
         self.load_data(dataset)
 
     def load_data(self,ds):
@@ -42,6 +52,10 @@ class RawDataset(Dataset):
         state_pose_x_output = ds['x_position_output']
         state_pose_y_output = ds['y_position_output'] 
         state_orientation_y_output = ds['yaw_output']
+        # nomial state
+        nomial_state_x = ds['nomial_x']
+        nomial_state_y = ds['nomial_y']
+        nomial_state_yaw = ds['nomial_yaw']
 
         # time
         self.dt = dt
@@ -56,6 +70,15 @@ class RawDataset(Dataset):
         self.state_pose_x_output = state_pose_x_output
         self.state_pose_y_output = state_pose_y_output
         self.state_orientation_y_output = state_orientation_y_output
+        # nomial state 
+        self.nomial_x = nomial_state_x
+        self.nomial_y = nomial_state_y
+        self.nomial_yaw = nomial_state_yaw
+        # resdiuals = output - nomial
+        self.res_x = self.state_pose_x_output - self.nomial_x
+        self.res_y = self.state_pose_y_output - self.nomial_y
+        self.res_yaw = self.state_orientation_y_output - self.nomial_yaw
+
 
     @property
     def x(self):
@@ -71,7 +94,7 @@ class RawDataset(Dataset):
         return self.gety()
     
     def gety(self):
-        data = np.column_stack((self.state_pose_x_output,self.state_pose_y_output,self.state_orientation_y_output)) # 3 dims
+        data = np.column_stack((self.res_x, self.res_y, self.res_yaw)) # 3 dims
         return data
 
 
@@ -111,9 +134,52 @@ class NormalizedMlp(mc.TorchMLCasadiModule):
         self.register_buffer('y_std', y_std)
 
     def forward(self, x):
-        # print(x.shape)
-        # print(self.y_mean.shape)
         return (self.model((x - self.x_mean) / self.x_std) * self.y_std) + self.y_mean
 
     def cs_forward(self, x):
         return (self.model((x - self.x_mean.cpu().numpy()) / self.x_std.cpu().numpy()) * self.y_std.cpu().numpy()) + self.y_mean.cpu().numpy()
+
+
+class NomialModel:
+    def __init__(self,data,row_dim,state_col_dim):
+        self.data = data
+        self.model_expl = np.zeros((row_dim, state_col_dim))
+        # self.model_expl = np.array([[]])
+        self.u = cs.MX.sym('u', 3)
+        self.x = cs.MX.sym('x', 3)
+        self.dt = cs.MX.sym('dt', 1)
+        self.nomial_model()
+        self.extract_state()
+        
+
+    def extract_state(self):
+        cur_state_x = self.data['x_position_input']
+        cur_state_y = self.data['y_position_input']
+        cur_state_yaw = self.data['yaw_input']
+        cur_vel_x = self.data['con_x_input']
+        cur_vel_y = self.data['con_z_input']
+        self.lenth = cur_vel_x.shape[0]
+        cur_dt = np.zeros((self.lenth,1)) + 0.1
+        # print(cur_dt.shape[0])
+        self.x = np.column_stack((cur_state_x, cur_state_y, cur_state_yaw))
+        self.u = np.column_stack((cur_vel_x, cur_vel_y, cur_dt))
+        self.dt = cur_dt
+
+        
+    def nomial_model(self):
+        u = self.u
+        x = self.x
+        dt =self.dt
+        rhs = [x[0]+u[0]*cs.cos(x[2])*dt,x[1]+u[1]*cs.sin(x[2])*dt,x[2]+u[1]*dt]
+        self.f = cs.Function('nomial', [x, u, dt], [cs.vcat(rhs)], ['x', 'u', 'dt'],['next_state_nomial'])    
+
+    def calc_nomial(self):  
+        # print(self.u.shape[0])
+        # print(self.x.shape[0])
+        # self.model_expl = []
+        # print(self.f(self.x[0], self.u[0], self.dt[0])[0])
+        for j in range(self.x.shape[0]):
+            self.model_expl[j,0] = self.f(self.x[j], self.u[j], self.dt[j])[0]
+            self.model_expl[j,1] = self.f(self.x[j], self.u[j], self.dt[j])[1]
+            self.model_expl[j,2] = self.f(self.x[j], self.u[j], self.dt[j])[2]
+        return self.model_expl

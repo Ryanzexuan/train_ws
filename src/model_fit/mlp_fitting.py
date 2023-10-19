@@ -18,7 +18,7 @@ import time
 import argparse
 import subprocess
 import numpy as np
-
+import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 import ml_casadi.torch as mc
@@ -26,11 +26,20 @@ import ml_casadi.torch as mc
 from tqdm import tqdm
 
 from model_fit.gp_common import GPDataset, read_dataset
-from model_fit.mlp_common import RawDataset, NormalizedMlp, MlpDataset
+from model_fit.mlp_common import RawDataset, NormalizedMlp, MlpDataset, NomialModel
 from config.configuration_parameters import ModelFitConfig as Conf
 from src.utils.utils import safe_mkdir_recursive, load_pickled_models
 from src.utils.utils import get_model_dir_and_file
 
+def data_pre_process(data):
+    """
+    It is used for calculate the nomial state given the data
+    """
+    nomial_model = NomialModel(data,data.shape[0],3)   #  3 is [x, y, yaw]
+    nomial_state = nomial_model.calc_nomial()
+    df_val_pd = pd.DataFrame(nomial_state, columns=["nomial_x", "nomial_y", "nomial_yaw"])
+    df_new = pd.concat([data, df_val_pd], axis=1)
+    return df_new
 
 def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_options, dataset_name,
          x_cap, hist_bins, hist_thresh,
@@ -47,7 +56,7 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
     gp_name_dict = {"git": git_version, "model_name": model_name, "params": quad_sim_options}
     save_file_path, save_file_name = get_model_dir_and_file(gp_name_dict)
     save_file_path = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict["git"]), str(gp_name_dict["model_name"]))
-    # print(save_file_path)
+    print(save_file_path)
     safe_mkdir_recursive(save_file_path)
     print(f'{gp_name_dict},{save_file_path},{save_file_name}')
     
@@ -58,7 +67,7 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
         #                              cap=x_cap, n_bins=hist_bins, thresh=hist_thresh)
         gp_dataset_val = None
         try:
-            df_val = read_dataset(dataset_name, False, quad_sim_options)
+            df_val_pre = read_dataset(dataset_name, False, quad_sim_options)
             # gp_dataset_val = GPDataset(df_val, x_features, u_features, reg_y_dims,
             #                            cap=x_cap, n_bins=hist_bins, thresh=hist_thresh)
         except:
@@ -67,7 +76,8 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
         raise TypeError("dataset_name must be a string.")
     # invalid = np.where( == 0)
     # print(df_val['vel_x'])
-    raw_dataset_train = RawDataset(df_val)
+    df_nomial = data_pre_process(df_val_pre)
+    raw_dataset_train = RawDataset(df_nomial)
     dataset_train = MlpDataset(raw_dataset_train)
     x_mean, x_std, y_mean, y_std = dataset_train.stats() # SMU seems useless
     
@@ -123,6 +133,7 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
         import matplotlib.pyplot as plt
         plt.plot(loss_infos)
         plt.show()
+    # print("ok")
 
 if __name__ == '__main__':
 

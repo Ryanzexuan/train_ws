@@ -8,6 +8,9 @@ from acados_template import AcadosSimSolver, AcadosOcpSolver, AcadosSim, AcadosO
 from src.model_fitting.mlp_common import NormalizedMLP
 import time
 import os
+import math
+import subprocess
+import tf.transformations as tf
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 
@@ -69,13 +72,13 @@ class DoubleIntegratorWithLearnedDynamics:
         x_dot = cs.vertcat(s_dot)
         print("1 in")
         res_model = self.learned_dyn.approx(x_input) # (f_a+mac(df_a,(vertcat(s, s_dot)-a),zeros(2x1))) 
-        print(res_model)
+        # print(res_model)
         p = self.learned_dyn.sym_approx_params(order=1, flat=True) # vertcat(a, f_a, vec(df_a)) 
-        print(p)
+        # print(p)
         parameter_values = self.learned_dyn.approx_params(np.array([0, 0, 0, 0, 0, 0]), flat=True, order=1) # obtain value:(a, f_a, vec(df_a)) ;   np.array([0, 0]) transfers to variable a;
         
         ## YZX with dt
-        rhs = [u[0]*cs.cos(state[2])*dt,u[1]*cs.sin(state[2])*dt,u[1]*dt] # u =[v,w] s = [x,y,theta]
+        rhs = [state[0]+u[0]*cs.cos(state[2])*dt,state[1]+u[1]*cs.sin(state[2])*dt,state[2]+u[1]*dt] # u =[v,w] s = [x,y,theta]
         f = cs.Function('f',[state, u, dt],[cs.vcat(rhs)],['input_state','u','dt'],['next_state_nomial'])
         f_expl = f(state,u,dt) + res_model  # f_expl means the next state would be "f(s_dot,u) + f_a+mac(df_a,(vertcat(s, s_dot)-a)"
 
@@ -224,9 +227,21 @@ class MPC:
 
 
 def run():
-    N = 10 
-    # YZX add need to change each time after train
-    saved_dict = torch.load("/home/ryan/train_ws/results/model_fitting/d264f6b/simple_sim_mlp/drag__motor_noise__noisy__no_payload.pt")
+    N = 10  # YZX notes:true predict horizon 
+
+    # Get git commit hash for saving the model
+    git_version = ''
+    try:
+        git_version = subprocess.check_output(['git', 'describe', '--always']).strip().decode("utf-8")
+    except subprocess.CalledProcessError as e:
+        print(e.returncode, e.output)
+    print("The model will be saved using hash: %s" % git_version)
+    gp_name_dict = {"git": git_version, "model_name":"simple_sim_mlp"}
+
+    ## YZX add need to change each time after train
+    pt_file = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict['git']), str(gp_name_dict['model_name']), str("drag__motor_noise__noisy__no_payload.pt"))
+    # saved_dict = torch.load("/home/ryan/train_ws/results/model_fitting/c7c30c3/simple_sim_mlp/drag__motor_noise__noisy__no_payload.pt")
+    saved_dict = torch.load(pt_file)
     if MODEL_ARCH == 'MLP':
         learned_dyn_model = MLP(saved_dict['input_size'], saved_dict['hidden_size'], 
                                 saved_dict['output_size'], saved_dict['hidden_layers'], 'Tanh')
@@ -245,6 +260,11 @@ def run():
         print('Moving Model to GPU')
         learn_model = learn_model.to('cuda:0')
         print('Model is on GPU')
+    ## YZX Test model firstly manually
+    # with torch.no_grad():
+    #     out = learn_model(torch.tensor([-0.070665, 0.00456055, 0.0165792, 2, 0.309718, 0.007]))
+    # print(out)
+    
     model = DoubleIntegratorWithLearnedDynamics(learn_model)
     solver = MPC(model=model.model(), N=N).solver
 
@@ -256,36 +276,50 @@ def run():
         x_l.append(solver.get(i, "x"))
         u_l.append(solver.get(i, "u"))
         input_l = np.hstack((x_l, u_l))
-        print(input_l.shape)
+        # print(input_l.shape)
     for i in range(20):
         learned_dyn_model.approx_params(np.stack(input_l, axis=0), flat=True)
     print('Warmed up!')
 
     x = []
-    x_ref = []
+    y_ref = []
     ts = 1. / N
     xt = np.array([0., 0., 0]) # boundary for x 
     opt_times = []
+    # solver.print_statistics()
+
     
+        # print(ref)
+    path_count = 0
     # tq = tqdm(range(50))
     for i in range(50):
         now = time.time()
-        t = np.linspace(i * ts, i * ts + 1., 10)
-        y_xpos = 10 * np.sin(0.0156*t)
-        y_ypos = 10 - 10 * np.cos(0.0156*t)
+        t = np.linspace(path_count//10, 100, 100)
+        # print(t)
+        y_xpos = 5 * np.sin(0.0156*t)
+        y_ypos = 5 - 5 * np.cos(0.0156*t)
         y_yaw = 0.0156 * t
         yref = np.array([y_xpos,y_ypos, y_yaw]).T
-        # yref = np.sin(0.5 * t + np.pi / 2)
-        # x_ref.append(yref[0])
+        x_ref = []
         for t, ref in enumerate(yref):
-            solver.set(t, "yref", ref)
+            if path_count == 0:
+                y_ref.append(ref)
+            x_ref.append(ref)
+
+        index = findnearestIndex(xt, x_ref)
+        y_cur_ref = Set_y_ref(x_ref, index, N)
+        for i in range(len(y_cur_ref)):
+            solver.set(i, "yref", y_cur_ref[i])
+
         # define the first state x must be the current time while lbx & ubx can be used to limit intermediate states status 
+        # draw(ref)
         solver.set(0, "lbx", xt)
         solver.set(0, "ubx", xt)
-        print("start solving")
-        solver.solve()
-        print(i)
+        # print("start solving")
+        status = solver.solve()
+        # print(i)
         xt = solver.get(1, "x")
+        print(xt)
         x.append(xt)
         # the first deriavtive of MLP learned models as simplifying the NN 
         x_l = []
@@ -295,36 +329,61 @@ def run():
             u_l.append(solver.get(i, "u"))
             input_l = np.hstack((x_l, u_l))
         params = learned_dyn_model.approx_params(np.stack(input_l, axis=0), flat=True)
+        # print(params)
         for i in range(N):
             solver.set(i, "p", params[i])
-
+        # print(status)
         elapsed = time.time() - now
         opt_times.append(elapsed)
-        
+        solver.print_statistics()
+        path_count = path_count + 1
+        print(path_count)
+    plt.figure()
+    plt.grid(True)
     draw(x)
+    draw(y_ref)
+    plt.show()
+
+    # for j in range(len(x)):
+    #     print(f'{x[j]}\n')
+        
     print(f'Mean iteration time with CNN ResNet Model: {1000*np.mean(opt_times):.1f}ms -- {1/np.mean(opt_times):.0f}Hz)')
 
 def draw(data):
-    plt.figure(figsize=(5,5))
-    plt.xlim(0, 10)
-    plt.ylim(0, 10)
-    # print(data[50,1])
-    for j in range(len(data)):
-        x = []
-        y = []
-        p = data[j]
-        # print(p)
+    x = []
+    y = []
+    for i in range(len(data)):
+        p = data[i]
         x.append(p[0])
         y.append(p[1])
-        #plt.plot(x,y)
+    
+    plt.plot(x, y, marker='o', linestyle='-')
+    
+        
+def Set_y_ref(ref_path, idx, Horizon):
+    cur_ref_path = []
+    min_idx = min(idx + Horizon, len(ref_path))
+    # print(min_idx)
 
-    x = np.linspace(-5, 5, 100)
-    y1 = np.sin(x)
-    plt.plot(x,y1)
-    plt.show()
+    for i in range(idx, min_idx):
+        cur_ref_path.append(ref_path[i])
+    # print(len(cur_ref_path))
+    return cur_ref_path
 
 
+def findnearestIndex(cur_pos,ref_path):
+    min_dist = 10000
+    index = -1
+    for i in range(len(ref_path)):
+        ref = ref_path[i]
+        dx = cur_pos[0] - ref[0]
+        dy = cur_pos[1] - ref[1]
+        dist = math.sqrt(dx * dx + dy * dy)
 
+        if dist < min_dist:
+            min_dist = dist
+            index = i
+    return index
 
 if __name__ == '__main__':
     run()
