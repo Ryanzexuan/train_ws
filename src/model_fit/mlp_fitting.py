@@ -24,16 +24,9 @@ from torch.utils.data import DataLoader
 import ml_casadi.torch as mc
 
 from tqdm import tqdm
-<<<<<<< HEAD
 
 from model_fit.gp_common import GPDataset, read_dataset
 from model_fit.mlp_common import RawDataset, NormalizedMlp, MlpDataset, NomialModel
-=======
-import sys
-sys.path.append('/home/ryan/train_ws/src')
-from model_fit.gp_common import GPDataset, read_dataset
-from model_fit.mlp_common import RawDataset, NormalizedMlp, MlpDataset
->>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
 from config.configuration_parameters import ModelFitConfig as Conf
 from src.utils.utils import safe_mkdir_recursive, load_pickled_models
 from src.utils.utils import get_model_dir_and_file
@@ -62,11 +55,8 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
 
     gp_name_dict = {"git": git_version, "model_name": model_name, "params": quad_sim_options}
     save_file_path, save_file_name = get_model_dir_and_file(gp_name_dict)
-<<<<<<< HEAD
     save_file_path = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict["git"]), str(gp_name_dict["model_name"]))
     print(save_file_path)
-=======
->>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
     safe_mkdir_recursive(save_file_path)
     print(f'{gp_name_dict},{save_file_path},{save_file_name}')
     
@@ -86,20 +76,12 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
         raise TypeError("dataset_name must be a string.")
     # invalid = np.where( == 0)
     # print(df_val['vel_x'])
-<<<<<<< HEAD
     df_nomial = data_pre_process(df_val_pre)
     raw_dataset_train = RawDataset(df_nomial)
     dataset_train = MlpDataset(raw_dataset_train)
     x_mean, x_std, y_mean, y_std = dataset_train.stats() # SMU seems useless
     
     input_dims = 6   # inpute dimension +(~ if groud_effect else 0) or +len(x_features)
-=======
-    raw_dataset_train = RawDataset(df_val)
-    dataset_train = MlpDataset(raw_dataset_train)
-    x_mean, x_std, y_mean, y_std = dataset_train.stats() # SMU seems useless
-    
-    input_dims = 2   # inpute dimension +(~ if groud_effect else 0) or +len(x_features)
->>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
     data_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0)
     mlp_model = mc.nn.MultiLayerPerceptron(input_dims, hidden_size, len(reg_y_dims), hidden_layers, 'Tanh')
     model = NormalizedMlp(mlp_model,torch.tensor(x_mean).float(), torch.tensor(x_std).float(), torch.tensor(y_mean).float(), torch.tensor(y_std).float())
@@ -121,10 +103,7 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
                     y = y.to(cuda_name)
             x = x.float()
             y = y.float()
-<<<<<<< HEAD
             # print(y)
-=======
->>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
             optimizer.zero_grad()
             y_pred = model(x)
             loss = torch.square(y-y_pred).mean()
@@ -148,7 +127,6 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
             'hidden_layers': hidden_layers
         }
     torch.save(save_dict, os.path.join(save_file_path, f'{save_file_name}.pt'))
-<<<<<<< HEAD
     print(save_dict["output_size"])
 
     if 1:
@@ -156,14 +134,6 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
         plt.plot(loss_infos)
         plt.show()
     # print("ok")
-=======
-
-
-    if 1:
-        import matplotlib.pyplot as plt
-        # plt.plot(loss_infos)
-        plt.show()
->>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
 
 if __name__ == '__main__':
 
@@ -191,11 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--u', action="store_true",
                         help='Use the control as input to the model.')
 
-<<<<<<< HEAD
     parser.add_argument("--y", nargs='+', type=int, default=[1,2,3],
-=======
-    parser.add_argument("--y", nargs='+', type=int, default=[2],
->>>>>>> 6c5f7d5be5bdb7732e45f2f7bd67fabee911839b
                         help="Regression Y variable. Must be an integer between 0 and 12. Velocities xyz correspond to"
                              "indices 7, 8, 9.")
 
