@@ -1,0 +1,484 @@
+{
+    "acados_include_path": "/home/ryan/raigor_ws/src/acados/include",
+    "acados_lib_path": "/home/ryan/raigor_ws/src/acados/lib",
+    "code_export_directory": "/home/ryan/train_ws/c_generated_code",
+    "constraints": {
+        "C": [],
+        "C_e": [],
+        "D": [],
+        "constr_type": "BGH",
+        "constr_type_e": "BGH",
+        "has_x0": true,
+        "idxbu": [
+            0,
+            1,
+            2
+        ],
+        "idxbx": [],
+        "idxbx_0": [
+            0,
+            1,
+            2
+        ],
+        "idxbx_e": [],
+        "idxbxe_0": [
+            0,
+            1,
+            2
+        ],
+        "idxsbu": [],
+        "idxsbx": [],
+        "idxsbx_e": [],
+        "idxsg": [],
+        "idxsg_e": [],
+        "idxsh": [],
+        "idxsh_e": [],
+        "idxsphi": [],
+        "idxsphi_e": [],
+        "lbu": [
+            -10,
+            -10,
+            -10
+        ],
+        "lbx": [],
+        "lbx_0": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "lbx_e": [],
+        "lg": [],
+        "lg_e": [],
+        "lh": [],
+        "lh_e": [],
+        "lphi": [],
+        "lphi_e": [],
+        "lsbu": [],
+        "lsbx": [],
+        "lsbx_e": [],
+        "lsg": [],
+        "lsg_e": [],
+        "lsh": [],
+        "lsh_e": [],
+        "lsphi": [],
+        "lsphi_e": [],
+        "ubu": [
+            10,
+            10,
+            10
+        ],
+        "ubx": [],
+        "ubx_0": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "ubx_e": [],
+        "ug": [],
+        "ug_e": [],
+        "uh": [],
+        "uh_e": [],
+        "uphi": [],
+        "uphi_e": [],
+        "usbu": [],
+        "usbx": [],
+        "usbx_e": [],
+        "usg": [],
+        "usg_e": [],
+        "ush": [],
+        "ush_e": [],
+        "usphi": [],
+        "usphi_e": []
+    },
+    "cost": {
+        "Vu": [
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ]
+        ],
+        "Vu_0": [
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ]
+        ],
+        "Vx": [
+            [
+                1.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ]
+        ],
+        "Vx_0": [
+            [
+                1.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ]
+        ],
+        "Vx_e": [
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ]
+        ],
+        "Vz": [
+            []
+        ],
+        "Vz_0": [
+            []
+        ],
+        "W": [
+            [
+                7,
+                0,
+                0
+            ],
+            [
+                0,
+                2,
+                0
+            ],
+            [
+                0,
+                0,
+                8
+            ]
+        ],
+        "W_0": [
+            [
+                7,
+                0,
+                0
+            ],
+            [
+                0,
+                2,
+                0
+            ],
+            [
+                0,
+                0,
+                8
+            ]
+        ],
+        "W_e": [
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                0.0
+            ]
+        ],
+        "Zl": [],
+        "Zl_e": [],
+        "Zu": [],
+        "Zu_e": [],
+        "cost_ext_fun_type": "casadi",
+        "cost_ext_fun_type_0": "casadi",
+        "cost_ext_fun_type_e": "casadi",
+        "cost_type": "LINEAR_LS",
+        "cost_type_0": "LINEAR_LS",
+        "cost_type_e": "LINEAR_LS",
+        "yref": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "yref_0": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "yref_e": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "zl": [],
+        "zl_e": [],
+        "zu": [],
+        "zu_e": []
+    },
+    "cython_include_dirs": [
+        "/home/ryan/anaconda3/envs/py39/lib/python3.9/site-packages/numpy/core/include",
+        "/home/ryan/anaconda3/envs/py39/include/python3.9"
+    ],
+    "dims": {
+        "N": 10,
+        "nbu": 3,
+        "nbx": 0,
+        "nbx_0": 3,
+        "nbx_e": 0,
+        "nbxe_0": 3,
+        "ng": 0,
+        "ng_e": 0,
+        "nh": 0,
+        "nh_e": 0,
+        "np": 27,
+        "nphi": 0,
+        "nphi_e": 0,
+        "nr": 0,
+        "nr_e": 0,
+        "ns": 0,
+        "ns_0": 0,
+        "ns_e": 0,
+        "nsbu": 0,
+        "nsbx": 0,
+        "nsbx_e": 0,
+        "nsg": 0,
+        "nsg_e": 0,
+        "nsh": 0,
+        "nsh_e": 0,
+        "nsphi": 0,
+        "nsphi_e": 0,
+        "nu": 3,
+        "nx": 3,
+        "ny": 3,
+        "ny_0": 3,
+        "ny_e": 3,
+        "nz": 0
+    },
+    "json_file": "acados_ocp_nlp.json",
+    "model": {
+        "con_h_expr": null,
+        "con_h_expr_e": null,
+        "con_phi_expr": null,
+        "con_phi_expr_e": null,
+        "con_r_expr": null,
+        "con_r_expr_e": null,
+        "con_r_in_phi": null,
+        "con_r_in_phi_e": null,
+        "cost_conl_custom_outer_hess": null,
+        "cost_conl_custom_outer_hess_0": null,
+        "cost_conl_custom_outer_hess_e": null,
+        "cost_expr_ext_cost": null,
+        "cost_expr_ext_cost_0": null,
+        "cost_expr_ext_cost_custom_hess": null,
+        "cost_expr_ext_cost_custom_hess_0": null,
+        "cost_expr_ext_cost_custom_hess_e": null,
+        "cost_expr_ext_cost_e": null,
+        "cost_psi_expr": null,
+        "cost_psi_expr_0": null,
+        "cost_psi_expr_e": null,
+        "cost_r_in_psi_expr": null,
+        "cost_r_in_psi_expr_0": null,
+        "cost_r_in_psi_expr_e": null,
+        "cost_y_expr": null,
+        "cost_y_expr_0": null,
+        "cost_y_expr_e": null,
+        "disc_dyn_expr": null,
+        "dyn_disc_fun": null,
+        "dyn_disc_fun_jac": null,
+        "dyn_disc_fun_jac_hess": null,
+        "dyn_ext_fun_type": "casadi",
+        "dyn_generic_source": null,
+        "f_expl_expr": "(vertcat((state[0]+((u[0]*cos(state[2]))*dt)), (state[1]+((u[1]*sin(state[2]))*dt)), (state[2]+(u[1]*dt)))+(f_a+mac(df_a,(vertcat(state, u, dt)-a),zeros(3x1))))",
+        "f_impl_expr": "(state_dot-(vertcat((state[0]+((u[0]*cos(state[2]))*dt)), (state[1]+((u[1]*sin(state[2]))*dt)), (state[2]+(u[1]*dt)))+(f_a+mac(df_a,(vertcat(state, u, dt)-a),zeros(3x1)))))",
+        "gnsf": {
+            "nontrivial_f_LO": 1,
+            "purely_linear": 0
+        },
+        "name": "wr",
+        "p": "vertcat(a, f_a, vec(df_a))",
+        "u": "vertcat(u, dt)",
+        "x": "state",
+        "xdot": "state_dot",
+        "z": "0x0"
+    },
+    "parameter_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.08802901208400726,
+        0.003256802447140217,
+        -0.013970708474516869,
+        -0.003202934982255101,
+        -0.024786503985524178,
+        -0.004454939626157284,
+        -0.01048042718321085,
+        -0.00611749617382884,
+        -0.0015057572163641453,
+        0.05861698463559151,
+        0.10879001021385193,
+        0.025716813281178474,
+        -0.03633556142449379,
+        -0.010591922327876091,
+        -0.006088352296501398,
+        -0.1717052012681961,
+        -0.34957072138786316,
+        -0.1218067854642868,
+        0.9022716283798218,
+        2.0770294666290283,
+        0.7973208427429199
+    ],
+    "problem_class": "OCP",
+    "shared_lib_ext": ".so",
+    "solver_options": {
+        "Tsim": 0.1,
+        "alpha_min": 0.05,
+        "alpha_reduction": 0.7,
+        "collocation_type": "GAUSS_LEGENDRE",
+        "cost_discretization": "EULER",
+        "custom_templates": [],
+        "custom_update_copy": true,
+        "custom_update_filename": "",
+        "custom_update_header_filename": "",
+        "eps_sufficient_descent": 0.0001,
+        "exact_hess_constr": 1,
+        "exact_hess_cost": 1,
+        "exact_hess_dyn": 1,
+        "ext_cost_num_hess": 0,
+        "ext_fun_compile_flags": "-O2",
+        "full_step_dual": 0,
+        "globalization": "FIXED_STEP",
+        "globalization_use_SOC": 0,
+        "hessian_approx": "GAUSS_NEWTON",
+        "hpipm_mode": "BALANCE",
+        "initialize_t_slacks": 0,
+        "integrator_type": "ERK",
+        "levenberg_marquardt": 0.0,
+        "line_search_use_sufficient_descent": 0,
+        "model_external_shared_lib_dir": null,
+        "model_external_shared_lib_name": null,
+        "nlp_solver_ext_qp_res": 0,
+        "nlp_solver_max_iter": 100,
+        "nlp_solver_step_length": 1.0,
+        "nlp_solver_tol_comp": 1e-06,
+        "nlp_solver_tol_eq": 1e-06,
+        "nlp_solver_tol_ineq": 1e-06,
+        "nlp_solver_tol_stat": 1e-06,
+        "nlp_solver_type": "SQP_RTI",
+        "print_level": 0,
+        "qp_solver": "FULL_CONDENSING_HPIPM",
+        "qp_solver_cond_N": null,
+        "qp_solver_cond_ric_alg": 1,
+        "qp_solver_iter_max": 50,
+        "qp_solver_ric_alg": 1,
+        "qp_solver_tol_comp": null,
+        "qp_solver_tol_eq": null,
+        "qp_solver_tol_ineq": null,
+        "qp_solver_tol_stat": null,
+        "qp_solver_warm_start": 0,
+        "regularize_method": null,
+        "shooting_nodes": null,
+        "sim_method_jac_reuse": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        "sim_method_newton_iter": 3,
+        "sim_method_newton_tol": 0.0,
+        "sim_method_num_stages": [
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4
+        ],
+        "sim_method_num_steps": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+        ],
+        "tf": 1.0,
+        "time_steps": [
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+        ]
+    },
+    "zoro_description": null
+}
