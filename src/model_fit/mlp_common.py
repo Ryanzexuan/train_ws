@@ -115,9 +115,6 @@ class MlpDataset(Dataset):
 
 
     def stats(self):
-        # x_mean = np.hstack([self.x.mean(axis=0), np.zeros(2)])
-        # x_std = np.hstack([self.x.std(axis=0), np.ones(2)])
-        # print(x_mean)
         return self.x.mean(axis=0), self.x.std(axis=0), self.y.mean(axis=0), self.y.std(axis=0)
 
 
@@ -159,7 +156,7 @@ class NomialModel:
         cur_vel_x = self.data['con_x_input']
         cur_vel_y = self.data['con_z_input']
         self.lenth = cur_vel_x.shape[0]
-        cur_dt = np.zeros((self.lenth,1)) + 0.1
+        cur_dt = np.zeros((self.lenth,1)) + 0.01
         # print(cur_dt.shape[0])
         self.x = np.column_stack((cur_state_x, cur_state_y, cur_state_yaw))
         self.u = np.column_stack((cur_vel_x, cur_vel_y, cur_dt))

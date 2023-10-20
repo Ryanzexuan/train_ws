@@ -239,9 +239,9 @@ def run():
     gp_name_dict = {"git": git_version, "model_name":"simple_sim_mlp"}
 
     ## YZX add need to change each time after train
-    pt_file = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict['git']), str(gp_name_dict['model_name']), str("drag__motor_noise__noisy__no_payload.pt"))
-    # saved_dict = torch.load("/home/ryan/train_ws/results/model_fitting/c7c30c3/simple_sim_mlp/drag__motor_noise__noisy__no_payload.pt")
+    pt_file = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict['git']), str("drag__motor_noise__noisy__no_payload.pt"))
     saved_dict = torch.load(pt_file)
+    #saved_dict = torch.load("/home/ryan/train_ws/results/model_fitting/c7c30c3/simple_sim_mlp/drag__motor_noise__noisy__no_payload.pt")
     if MODEL_ARCH == 'MLP':
         learned_dyn_model = MLP(saved_dict['input_size'], saved_dict['hidden_size'], 
                                 saved_dict['output_size'], saved_dict['hidden_layers'], 'Tanh')
@@ -292,9 +292,9 @@ def run():
         # print(ref)
     path_count = 0
     # tq = tqdm(range(50))
-    for i in range(50):
+    for i in range(20):
         now = time.time()
-        t = np.linspace(path_count//10, 100, 100)
+        t = np.linspace(0, 100, 100)
         # print(t)
         y_xpos = 5 * np.sin(0.0156*t)
         y_ypos = 5 - 5 * np.cos(0.0156*t)
@@ -308,8 +308,8 @@ def run():
 
         index = findnearestIndex(xt, x_ref)
         y_cur_ref = Set_y_ref(x_ref, index, N)
-        for i in range(len(y_cur_ref)):
-            solver.set(i, "yref", y_cur_ref[i])
+        for j in range(len(y_cur_ref)):
+            solver.set(j, "yref", y_cur_ref[j])
 
         # define the first state x must be the current time while lbx & ubx can be used to limit intermediate states status 
         # draw(ref)

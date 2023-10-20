@@ -25,10 +25,10 @@ import ml_casadi.torch as mc
 
 from tqdm import tqdm
 
-from model_fit.gp_common import GPDataset, read_dataset
+from model_fit.gp_common import read_dataset
 from model_fit.mlp_common import RawDataset, NormalizedMlp, MlpDataset, NomialModel
 from config.configuration_parameters import ModelFitConfig as Conf
-from src.utils.utils import safe_mkdir_recursive, load_pickled_models
+from src.utils.utils import safe_mkdir_recursive
 from src.utils.utils import get_model_dir_and_file
 
 def data_pre_process(data):
@@ -44,8 +44,10 @@ def data_pre_process(data):
 def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_options, dataset_name,
          x_cap, hist_bins, hist_thresh,
          model_name="model", epochs=100, batch_size=64, hidden_layers=1, hidden_size=32, plot=False):
-
-    # Get git commit hash for saving the model
+    """
+    reg_y_dims: use to determine y dimension
+    """
+    # #### Get git commit hash for saving the model #### #
     git_version = ''
     try:
         git_version = subprocess.check_output(['git', 'describe', '--always']).strip().decode("utf-8")
@@ -53,38 +55,37 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
         print(e.returncode, e.output)
     print("The model will be saved using hash: %s" % git_version)
 
+    # #### Get data source path #### #
     gp_name_dict = {"git": git_version, "model_name": model_name, "params": quad_sim_options}
     save_file_path, save_file_name = get_model_dir_and_file(gp_name_dict)
     save_file_path = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict["git"]), str(gp_name_dict["model_name"]))
-    print(save_file_path)
+    # print(save_file_path)
     safe_mkdir_recursive(save_file_path)
     print(f'{gp_name_dict},{save_file_path},{save_file_name}')
     
     # #### DATASET LOADING #### #
     if isinstance(dataset_name, str):
         df_train = read_dataset(dataset_name, True, quad_sim_options)
-        # gp_dataset_train = GPDataset(df_train, x_features, u_features, reg_y_dims,
-        #                              cap=x_cap, n_bins=hist_bins, thresh=hist_thresh)
         gp_dataset_val = None
         try:
             df_val_pre = read_dataset(dataset_name, False, quad_sim_options)
-            # gp_dataset_val = GPDataset(df_val, x_features, u_features, reg_y_dims,
-            #                            cap=x_cap, n_bins=hist_bins, thresh=hist_thresh)
         except:
             print('Could not find test dataset.')
     else:
         raise TypeError("dataset_name must be a string.")
     # invalid = np.where( == 0)
     # print(df_val['vel_x'])
-    df_nomial = data_pre_process(df_val_pre)
-    raw_dataset_train = RawDataset(df_nomial)
-    dataset_train = MlpDataset(raw_dataset_train)
-    x_mean, x_std, y_mean, y_std = dataset_train.stats() # SMU seems useless
+
+    # #### Data processing and Init Data into private Class
+    df_nomial = data_pre_process(df_val_pre) # just need to know it is used to add one more property into dataset: nominal_state    in order to calculate residuals between nominal_state and actual output_state 
+    raw_dataset_train = RawDataset(df_nomial) # Turn raw data into pandas datatype
+    dataset_train = MlpDataset(raw_dataset_train) # Init MLP dataset
+    x_mean, x_std, y_mean, y_std = dataset_train.stats() # get info to help normalize data in MLP
     
-    input_dims = 6   # inpute dimension +(~ if groud_effect else 0) or +len(x_features)
-    data_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0)
-    mlp_model = mc.nn.MultiLayerPerceptron(input_dims, hidden_size, len(reg_y_dims), hidden_layers, 'Tanh')
-    model = NormalizedMlp(mlp_model,torch.tensor(x_mean).float(), torch.tensor(x_std).float(), torch.tensor(y_mean).float(), torch.tensor(y_std).float())
+    input_dims = 6  # MLP input dimension
+    data_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0) # dataloader
+    mlp_model = mc.nn.MultiLayerPerceptron(input_dims, hidden_size, len(reg_y_dims), hidden_layers, 'Tanh') # init MLP network structure
+    model = NormalizedMlp(mlp_model,torch.tensor(x_mean).float(), torch.tensor(x_std).float(), torch.tensor(y_mean).float(), torch.tensor(y_std).float()) # normalize MLP
 
     cuda_name = 'cuda:0'
     if torch.cuda.is_available():
@@ -92,6 +93,7 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
+    # #### Train #### # 
     loss_infos = []
     bar = tqdm(range(epochs))
     for i in bar:
