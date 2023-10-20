@@ -4,3 +4,5 @@
 ## Further recommended Requirements
 - Anaconda env is provided: ```python = 3.9 ``` or
 ``` conda env create -f py39.yaml```
+# Train
+``` python src/model_fit/mlp_fitting.py --model_name simple_sim_mlp --hidden_size 64 --hidden_layers 4 --epochs 100```
