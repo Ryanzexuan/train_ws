@@ -19,8 +19,8 @@ class RawDataset(Dataset):
         self.state_pose_y_input = None
         self.state_orientation_y_input = None   
         # control input
-        self.vel_x_input = None
-        self.vel_z_input = None
+        self.vel_x_u = None
+        self.vel_z_u = None
         # state output
         self.state_pose_x_output = None
         self.state_pose_y_output = None
@@ -33,7 +33,15 @@ class RawDataset(Dataset):
         self.res_x = None
         self.res_y =  None
         self.res_yaw = None
+        # vel output 
+        vel_x_out = None
+        vel_y_out = None
+        vel_w_out = None
 
+        # vel input 
+        vel_x_in = None
+        vel_y_in = None
+        vel_w_in = None
         self.load_data(dataset)
 
     def load_data(self,ds):
@@ -46,8 +54,8 @@ class RawDataset(Dataset):
         state_pose_y_input = ds['y_position_input']
         state_orientation_y_input = ds['yaw_input']  
         # control input
-        vel_x_input = ds['con_x_input']
-        vel_z_input = ds['con_z_input']
+        vel_x_u = ds['con_x_input']
+        vel_z_u = ds['con_z_input']
         # state output
         state_pose_x_output = ds['x_position_output']
         state_pose_y_output = ds['y_position_output'] 
@@ -56,16 +64,26 @@ class RawDataset(Dataset):
         nomial_state_x = ds['nomial_x']
         nomial_state_y = ds['nomial_y']
         nomial_state_yaw = ds['nomial_yaw']
+        # vel output 
+        vel_x_out = ds['vel_x_output']
+        vel_y_out = ds['vel_y_output']
+        vel_w_out = ds['vel_w_output']
+
+        # vel input 
+        vel_x_in = ds['vel_x_input']
+        vel_y_in = ds['vel_y_input']
+        vel_w_in = ds['vel_w_input']
 
         # time
         self.dt = dt
+        print(dt)
         # state input
         self.state_pose_x_input = state_pose_x_input
         self.state_pose_y_input = state_pose_y_input
         self.state_orientation_y_input = state_orientation_y_input   
         # control input
-        self.vel_x_input = vel_x_input
-        self.vel_z_input = vel_z_input
+        self.vel_x_u = vel_x_u
+        self.vel_z_u = vel_z_u
         # state output
         self.state_pose_x_output = state_pose_x_output
         self.state_pose_y_output = state_pose_y_output
@@ -79,13 +97,24 @@ class RawDataset(Dataset):
         self.res_y = self.state_pose_y_output - self.nomial_y
         self.res_yaw = self.state_orientation_y_output - self.nomial_yaw
 
+        # # calc the dynamic of state error (error rate) rather than state error itself   ### !!! 0.1 is control actual time not measurement time so it can be changed in the future
+        self.res_x /= dt
+        self.res_y /= dt
+        self.res_yaw /= dt
+        # print(self.res_x[0])
+        # print(self.res_y[0])
+        # print(self.res_yaw[0])
 
+        self.vel_x_out = vel_x_out
+        self.vel_y_out = vel_y_out
+        self.vel_w_out = vel_w_out
+  
     @property
     def x(self):
         return self.getx()
 
     def getx(self):
-        data = np.column_stack((self.state_pose_x_input,self.state_pose_y_input,self.state_orientation_y_input,self.vel_x_input, self.vel_z_input,self.dt)) # 6 dims
+        data = np.column_stack((self.state_pose_x_input,self.state_pose_y_input,self.state_orientation_y_input,self.vel_x_u, self.vel_z_u,self.dt)) # 6 dims
         # print(data.shape[1])
         return data
     
@@ -94,7 +123,7 @@ class RawDataset(Dataset):
         return self.gety()
     
     def gety(self):
-        data = np.column_stack((self.res_x, self.res_y, self.res_yaw)) # 3 dims
+        data = np.column_stack((self.vel_x_out, self.vel_y_out, self.vel_w_out)) # 3 dims
         return data
 
 
@@ -131,11 +160,14 @@ class NormalizedMlp(mc.TorchMLCasadiModule):
         self.register_buffer('y_std', y_std)
 
     def forward(self, x):
+        # print("forward")
         return (self.model((x - self.x_mean) / self.x_std) * self.y_std) + self.y_mean
 
     def cs_forward(self, x):
         return (self.model((x - self.x_mean.cpu().numpy()) / self.x_std.cpu().numpy()) * self.y_std.cpu().numpy()) + self.y_mean.cpu().numpy()
-
+    
+    def forward_test(self, x):
+        return self.model(x)
 
 class NomialModel:
     def __init__(self,data,row_dim,state_col_dim):
@@ -150,13 +182,20 @@ class NomialModel:
         
 
     def extract_state(self):
+        # time
+        control_time = self.data['con_time']
+        output_state_time = self.data['output_time']
+        dt = output_state_time - control_time
+
         cur_state_x = self.data['x_position_input']
         cur_state_y = self.data['y_position_input']
         cur_state_yaw = self.data['yaw_input']
         cur_vel_x = self.data['con_x_input']
         cur_vel_y = self.data['con_z_input']
-        self.lenth = cur_vel_x.shape[0]
-        cur_dt = np.zeros((self.lenth,1)) + 0.01
+        print(dt)
+        print(np.where(dt == 0))
+        # self.lenth = cur_vel_x.shape[0]
+        cur_dt = dt
         # print(cur_dt.shape[0])
         self.x = np.column_stack((cur_state_x, cur_state_y, cur_state_yaw))
         self.u = np.column_stack((cur_vel_x, cur_vel_y, cur_dt))

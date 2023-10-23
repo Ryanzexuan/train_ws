@@ -239,9 +239,9 @@ def run():
     gp_name_dict = {"git": git_version, "model_name":"simple_sim_mlp"}
 
     ## YZX add need to change each time after train
-    pt_file = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict['git']), str("drag__motor_noise__noisy__no_payload.pt"))
-    saved_dict = torch.load(pt_file)
-    #saved_dict = torch.load("/home/ryan/train_ws/results/model_fitting/c7c30c3/simple_sim_mlp/drag__motor_noise__noisy__no_payload.pt")
+    # pt_file = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict['git']), str("drag__motor_noise__noisy__no_payload.pt"))
+    # saved_dict = torch.load(pt_file)
+    saved_dict = torch.load("/home/ryan/train_ws/results/model_fitting/c7c30c3/simple_sim_mlp/drag__motor_noise__noisy__no_payload.pt")
     if MODEL_ARCH == 'MLP':
         learned_dyn_model = MLP(saved_dict['input_size'], saved_dict['hidden_size'], 
                                 saved_dict['output_size'], saved_dict['hidden_layers'], 'Tanh')
@@ -324,10 +324,14 @@ def run():
         # the first deriavtive of MLP learned models as simplifying the NN 
         x_l = []
         u_l = []
+        input_l = []
         for i in range(N):
             x_l.append(solver.get(i, "x"))
             u_l.append(solver.get(i, "u"))
-            input_l = np.hstack((x_l, u_l))
+            input_l.append(np.hstack((x_l[i], u_l[i])))
+        # print("x:",x_l[1])
+        # print("u:",u_l[1])   
+        # print("input:",input_l[1])
         params = learned_dyn_model.approx_params(np.stack(input_l, axis=0), flat=True)
         # print(params)
         for i in range(N):

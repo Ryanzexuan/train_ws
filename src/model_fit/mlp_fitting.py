@@ -12,7 +12,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
 import sys
-sys.path.append('/home/ryan/train_ws/src')
+sys.path.append('/home/ryan/raigor/train_ws/src')
 import os
 import time
 import argparse
@@ -43,10 +43,12 @@ def data_pre_process(data):
 
 def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_options, dataset_name,
          x_cap, hist_bins, hist_thresh,
-         model_name="model", epochs=100, batch_size=64, hidden_layers=1, hidden_size=32, plot=False):
+         model_name="simple_sim_mlp", epochs=100, batch_size=64, hidden_layers=4, hidden_size=64, lr=1e-4,plot=False):
     """
     reg_y_dims: use to determine y dimension
     """
+    
+    print(f'epho:{epochs},hiddensize:{hidden_size},hidden_layer:{hidden_layers}')
     # #### Get git commit hash for saving the model #### #
     git_version = ''
     try:
@@ -58,40 +60,40 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
     # #### Get data source path #### #
     gp_name_dict = {"git": git_version, "model_name": model_name, "params": quad_sim_options}
     save_file_path, save_file_name = get_model_dir_and_file(gp_name_dict)
-    save_file_path = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict["git"]), str(gp_name_dict["model_name"]))
+    save_file_path = os.path.join("/home/ryan/raigor/train_ws/results/model_fitting/", str(gp_name_dict["git"]), str(gp_name_dict["model_name"]))
     # print(save_file_path)
     safe_mkdir_recursive(save_file_path)
     print(f'{gp_name_dict},{save_file_path},{save_file_name}')
     
     # #### DATASET LOADING #### #
     if isinstance(dataset_name, str):
-        df_train = read_dataset(dataset_name, True, quad_sim_options)
-        gp_dataset_val = None
         try:
             df_val_pre = read_dataset(dataset_name, False, quad_sim_options)
         except:
             print('Could not find test dataset.')
     else:
         raise TypeError("dataset_name must be a string.")
-    # invalid = np.where( == 0)
-    # print(df_val['vel_x'])
-
+    #
+    # df_val_pre [x_position_input	y_position_input	yaw_input	input_time	con_x_input	con_z_input	con_time	x_position_output	y_position_output	yaw_output	output_time]
+    
     # #### Data processing and Init Data into private Class
     df_nomial = data_pre_process(df_val_pre) # just need to know it is used to add one more property into dataset: nominal_state    in order to calculate residuals between nominal_state and actual output_state 
     raw_dataset_train = RawDataset(df_nomial) # Turn raw data into pandas datatype
     dataset_train = MlpDataset(raw_dataset_train) # Init MLP dataset
     x_mean, x_std, y_mean, y_std = dataset_train.stats() # get info to help normalize data in MLP
-    
+    print(x_mean, x_std, y_mean, y_std)
     input_dims = 6  # MLP input dimension
+    print(input_dims,len(reg_y_dims))
     data_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=0) # dataloader
     mlp_model = mc.nn.MultiLayerPerceptron(input_dims, hidden_size, len(reg_y_dims), hidden_layers, 'Tanh') # init MLP network structure
-    model = NormalizedMlp(mlp_model,torch.tensor(x_mean).float(), torch.tensor(x_std).float(), torch.tensor(y_mean).float(), torch.tensor(y_std).float()) # normalize MLP
+    model = NormalizedMlp(mlp_model, torch.tensor(x_mean).float(), torch.tensor(x_std).float(), 
+                          torch.tensor(y_mean).float(), torch.tensor(y_std).float()) # normalize MLP
 
     cuda_name = 'cuda:0'
     if torch.cuda.is_available():
         model = model.to(cuda_name)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # #### Train #### # 
     loss_infos = []
@@ -107,18 +109,24 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
             y = y.float()
             # print(y)
             optimizer.zero_grad()
-            y_pred = model(x)
+            y_pred = model(x)  #  using forward not using model.model(x)
+            # ## test forward
+            # y_forward_test = model.forward_test(x)
+            # y_forward = model.forward(x)
+            # print(f'y_forward - y_forward_test: {y_forward - y_forward_test}')
+            # print("y_pred - y_forward)",y_pred - y_forward)
+            # print(y_pred)
             loss = torch.square(y-y_pred).mean()
+            # print(loss)
             loss.backward()
             optimizer.step()
 
             losses.append(loss.item())
 
         train_loss_mean = np.mean(losses)
-        train_loss_std = np.std(losses)
         loss_info = train_loss_mean
         loss_infos.append(loss_info)
-        bar.set_description(f'Train Loss: {train_loss_mean:.6f}, Val Loss {loss_info:.6f}')
+        bar.set_description(f'Train Loss: {train_loss_mean:.6f}')
         bar.refresh()
 
     save_dict = {
@@ -128,6 +136,7 @@ def main(x_features, u_features, reg_y_dims, model_ground_effect, quad_sim_optio
             'output_size': len(reg_y_dims),
             'hidden_layers': hidden_layers
         }
+    print(f'save file in :{save_file_path}')
     torch.save(save_dict, os.path.join(save_file_path, f'{save_file_name}.pt'))
     print(save_dict["output_size"])
 
@@ -141,17 +150,20 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--epochs", type=int, default="1000",
+    parser.add_argument("--epochs", type=int, default="100",
                         help="Number of epochs to train the model.")
 
     parser.add_argument("--batch_size", type=int, default="64",
                         help="Batch Size.")
 
-    parser.add_argument("--hidden_layers", type=int, default="1",
+    parser.add_argument("--hidden_layers", type=int, default="4",
                         help="Number of hidden layers.")
 
-    parser.add_argument("--hidden_size", type=int, default="32",
+    parser.add_argument("--hidden_size", type=int, default="64",
                         help="Size of hidden layers.")
+    
+    parser.add_argument("--lr", type=float, default="1e-4",
+                        help="Learning rate.")
 
     parser.add_argument("--model_name", type=str, default="",
                         help="Name assigned to the trained model.")
@@ -193,6 +205,7 @@ if __name__ == '__main__':
     batch_size = input_arguments.batch_size
     hidden_layers = input_arguments.hidden_layers
     hidden_size = input_arguments.hidden_size
+    lr = input_arguments.lr
     plot = input_arguments.plot
 
     ds_name = Conf.ds_name
@@ -206,4 +219,4 @@ if __name__ == '__main__':
     main(x_feats, u_feats, y_regressed_dims, model_ground_effect, simulation_options, ds_name,
          x_value_cap, histogram_pruning_bins, histogram_pruning_threshold,
          model_name=model_name, epochs=epochs, batch_size=batch_size, hidden_layers=hidden_layers,
-         hidden_size=hidden_size, plot=plot)
+         hidden_size=hidden_size, lr=lr,plot=plot)

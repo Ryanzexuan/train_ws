@@ -1,33 +1,21 @@
-import sys
-import numpy as np
-sys.path.append('/home/ryan/train_ws/src')
-from model_fit.mlp_common import RawDataset, NormalizedMlp, MlpDataset, NomialModel
-import pandas as pd
+import matplotlib.pyplot as plt
 
+# 创建示例数据
+x = [1, 2, 3, 4, 5]
+y1 = [2, 4, 6, 8, 10]
+y2 = [1, 3, 5, 7, 9]
 
+# 绘制两个轨迹并为它们添加标签
+plt.plot(x, y1, label='Line 1')
+plt.plot(x, y2, label='Line 2')
 
-def data_pre_process(data):
-    """
-    It is used for calculate the nomial state given the data
-    """
-    nomial_model = NomialModel(data,data.shape[0],3)
-    nomial_state = nomial_model.calc_nomial()
-    # print(nomial_state.shape[1])
-    df_val_pd = pd.DataFrame(nomial_state, columns=["nomial_x", "nomial_y", "nomial_yaw"])
-    df_val111 = pd.concat([data, df_val_pd], axis=1)
-    return df_val111
+# 添加图例（标签）
+plt.legend()
 
+# 设置图形的标题和轴标签
+plt.title('Trajectory Plot')
+plt.xlabel('X-axis')
+plt.ylabel('Y-axis')
 
-def main():
-    rec_file = "/home/ryan/train_ws/data/simplified_sim_dataset/train/dataset_002.csv"
-    ds = pd.read_csv(rec_file)
-    df_val = data_pre_process(ds)
-    print(df_val['x_position_output'] - df_val['nomial_x'])
-    # df_val_pd = pd.DataFrame(df_val, columns=["nomial_x", "nomial_y", "nomial_yaw"])
-    # df_val111 = pd.concat([ds, df_val_pd], axis=1)
-    # print(df_val111.shape[0])
-    # print(df_val111.shape[1])
-    # print(df_val[5].shape[1])
-
-if __name__ == '__main__':
-    main()
+# 显示图形
+plt.show()
