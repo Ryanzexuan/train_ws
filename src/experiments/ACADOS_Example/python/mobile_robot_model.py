@@ -50,9 +50,9 @@ class MobileRobotModel(object):
         constraint.omega_max = np.pi/4.0
         constraint.omega_min = -np.pi/4.0
         constraint.x_min = -2.
-        constraint.x_max = 2.
+        constraint.x_max = 50.
         constraint.y_min = -2.
-        constraint.y_max = 2.
+        constraint.y_max = 50.
         constraint.expr = ca.vcat([v, omega])
 
         self.model = model

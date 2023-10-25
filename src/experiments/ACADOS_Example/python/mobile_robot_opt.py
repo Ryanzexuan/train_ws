@@ -120,7 +120,7 @@ class MobileRobotOptimizer(object):
         simX[0, :] = x0.reshape(1, -1)
         xs_between = np.concatenate((xs, np.zeros(2)))
         time_record = np.zeros(self.N)
-
+        print(xs_between)
         # closed loop
         self.solver.set(self.N, 'yref', xs)
         for i in range(self.N):
@@ -160,4 +160,4 @@ if __name__ == '__main__':
     mobile_robot_model = MobileRobotModel()
     opt = MobileRobotOptimizer(m_model=mobile_robot_model.model,
                                m_constraint=mobile_robot_model.constraint, t_horizon=20, n_nodes=100)
-    opt.simulation(x0=np.array([0, 0, 0]), xs=np.array([2., 2., 0.]))
+    opt.simulation(x0=np.array([0, 0, 0]), xs=np.array([10., 5., 0.]))

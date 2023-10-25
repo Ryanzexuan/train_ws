@@ -529,9 +529,9 @@ void mobile_robot_acados_create_5_set_nlp_in(mobile_robot_solver_capsule* capsul
     double* ubx = lubx + NBX;
     
     lbx[0] = -2;
-    ubx[0] = 2;
+    ubx[0] = 50;
     lbx[1] = -2;
-    ubx[1] = 2;
+    ubx[1] = 50;
 
     for (int i = 1; i < N; i++)
     {
