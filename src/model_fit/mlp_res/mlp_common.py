@@ -56,6 +56,7 @@ class RawDataset(Dataset):
         # control input
         vel_x_u = ds['con_x_input']
         vel_z_u = ds['con_z_input']
+
         # state output
         state_pose_x_output = ds['x_position_output']
         state_pose_y_output = ds['y_position_output'] 
@@ -68,7 +69,7 @@ class RawDataset(Dataset):
         vel_x_out = ds['vel_x_output']
         vel_y_out = ds['vel_y_output']
         vel_w_out = ds['vel_w_output']
-
+        # print(f"vel_w_out:{vel_w_out}")
         # vel input 
         vel_x_in = ds['vel_x_input']
         vel_y_in = ds['vel_y_input']
@@ -76,18 +77,23 @@ class RawDataset(Dataset):
 
         # time
         self.dt = dt
-        print(dt)
+        # print(dt)
         # state input
         self.state_pose_x_input = state_pose_x_input
         self.state_pose_y_input = state_pose_y_input
         self.state_orientation_y_input = state_orientation_y_input   
         # control input
-        self.vel_x_u = vel_x_u
-        self.vel_z_u = vel_z_u
+        self.vel_x_u = vel_x_u * np.cos(state_orientation_y_input)
+        self.vel_y_u = vel_x_u * np.sin(state_orientation_y_input)
+        self.vel_z_u = vel_z_u 
         # state output
         self.state_pose_x_output = state_pose_x_output
         self.state_pose_y_output = state_pose_y_output
         self.state_orientation_y_output = state_orientation_y_output
+        # vel output
+        self.vel_x_out = vel_x_out
+        self.vel_y_out = vel_y_out
+        self.vel_w_out = vel_w_out
         # nomial state 
         self.nomial_x = nomial_state_x
         self.nomial_y = nomial_state_y
@@ -96,27 +102,54 @@ class RawDataset(Dataset):
         self.res_x = self.state_pose_x_output - self.nomial_x
         self.res_y = self.state_pose_y_output - self.nomial_y
         self.res_yaw = self.state_orientation_y_output - self.nomial_yaw
-
+        # vel residual
+        self.res_vel_x = vel_x_out - self.vel_x_u
+        self.res_vel_y = vel_y_out - self.vel_y_u
+        self.res_vel_w = vel_w_out - self.vel_z_u
+        # print(f"res_vel_yaw:{self.res_vel_yaw}")
+        dt = 1
         # # calc the dynamic of state error (error rate) rather than state error itself   ### !!! 0.1 is control actual time not measurement time so it can be changed in the future
         self.res_x /= dt
         self.res_y /= dt
         self.res_yaw /= dt
-        # print(self.res_x[0])
+        # print(self.res_x)
         # print(self.res_y[0])
-        # print(self.res_yaw[0])
+        print(f"self.res_x:\n{self.res_x}")
+        print(f"self.res_y:\n{self.res_y }")
+        print(f"self.res_yaw:\n{self.res_yaw}")
+        
+        self.res_vel_x /= dt
+        self.res_vel_y /= dt
+        self.res_vel_w /= dt
 
-        self.vel_x_out = vel_x_out
-        self.vel_y_out = vel_y_out
-        self.vel_w_out = vel_w_out
-  
+
+        
+    
+    def prune(self,data):
+        # print(f"data:{data}")
+        # print(f"dt:{self.dt}")
+        # print(f"data shape:{data.shape[0]}")
+        for i in range(data.shape[1]):
+            idx = np.where(self.dt[:] < 0.008)
+            # print(f"idx:{idx}")
+            data = np.delete(data, idx, axis=0)
+        print(data)
+        for i in range(data.shape[1]):
+            idx1 = np.where(data[:,i] > 50)
+            data = np.delete(data, idx1, axis=0)
+            # print(f"idx:{idx1}")
+        return data
+
     @property
     def x(self):
         return self.getx()
 
     def getx(self):
         data = np.column_stack((self.state_pose_x_input,self.state_pose_y_input,self.state_orientation_y_input,
-                                self.vel_x_u, self.vel_z_u,self.dt)) # 6 dims
+                                self.vel_x_u, self.vel_z_u)) # 5 dims
         # print(data.shape[1])
+        data = self.prune(data)
+        print(f"xdata:{data}")
         return data
     
     @property
@@ -125,6 +158,8 @@ class RawDataset(Dataset):
     
     def gety(self):
         data = np.column_stack((self.vel_x_out, self.vel_y_out, self.vel_w_out)) # 3 dims
+        data = self.prune(data)
+        print(f"ydata:{data}")
         return data
 
 
@@ -187,16 +222,18 @@ class NomialModel:
         control_time = self.data['con_time']
         output_state_time = self.data['output_time']
         dt = output_state_time - control_time
-
+        # print(f"dt:{dt}")
+        # print(f"output_state_time:{output_state_time}")
         cur_state_x = self.data['x_position_input']
         cur_state_y = self.data['y_position_input']
         cur_state_yaw = self.data['yaw_input']
         cur_vel_x = self.data['con_x_input']
         cur_vel_y = self.data['con_z_input']
-        print(dt)
-        print(np.where(dt == 0))
+        # print(f"cur_vel_x:{cur_vel_x}")
+        # print(f"dt=0:{np.where(dt == 0)}")
         # self.lenth = cur_vel_x.shape[0]
         cur_dt = dt
+        # print(f"dt:{dt}")
         # print(cur_dt.shape[0])
         self.x = np.column_stack((cur_state_x, cur_state_y, cur_state_yaw))
         self.u = np.column_stack((cur_vel_x, cur_vel_y, cur_dt))
@@ -207,14 +244,18 @@ class NomialModel:
         u = self.u
         x = self.x
         dt =self.dt
-        rhs = [x[0]+u[0]*cs.cos(x[2])*dt,x[1]+u[1]*cs.sin(x[2])*dt,x[2]+u[1]*dt]
+        # print(f"u:{u}")
+        # print(f"dt:{dt}")
+        # print(f"x:{x}")
+        rhs = [x[0]+0.7*u[0]*cs.cos(x[2])*dt,x[1]+0.5*u[1]*cs.sin(x[2])*dt,x[2]+0.4*u[1]*dt]
         self.f = cs.Function('nomial', [x, u, dt], [cs.vcat(rhs)], ['x', 'u', 'dt'],['next_state_nomial'])    
 
     def calc_nomial(self):  
-        # print(self.u.shape[0])
-        # print(self.x.shape[0])
+        # print(f"u :{self.u[0]}")
+        # print(f"x:{self.x[0]}")
+        # print(f"dt:{self.dt[0]}")
         # self.model_expl = []
-        # print(self.f(self.x[0], self.u[0], self.dt[0])[0])
+        print(f"self.f:{self.f(self.x[0], self.u[0], self.dt[0])[0]}")
         for j in range(self.x.shape[0]):
             self.model_expl[j,0] = self.f(self.x[j], self.u[j], self.dt[j])[0]
             self.model_expl[j,1] = self.f(self.x[j], self.u[j], self.dt[j])[1]

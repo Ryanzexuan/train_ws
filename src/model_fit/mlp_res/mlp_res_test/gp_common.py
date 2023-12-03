@@ -332,9 +332,12 @@ def read_dataset(name, train_split, sim_options):
     #     rec_file = os.path.join(rec_file_dir, rec_file_name)
     #     ds = np.load(rec_file)
     # else:
-    rec_file = "/home/ryan/raigor/train_ws/data/simplified_sim_dataset/train/dataset_003.csv"
+    rec_file = "/home/ryan/raigor/train_ws/data/simplified_sim_dataset/train/dataset__bad4res.csv"
     ds = pd.read_csv(rec_file,index_col=None,header=0)
-
+    print(ds)
+    ds.reset_index(drop=True, inplace=True)
+    # print(ds.iloc[:1000])
+    # ds = ds.iloc[:1000]
     return ds
 
 

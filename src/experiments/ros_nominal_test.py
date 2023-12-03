@@ -1,6 +1,7 @@
 import sys
 sys.path.append("/home/ryan/raigor/train_ws/src/")
 import pandas as pd
+import rospy
 import casadi as cs
 import numpy as np
 import torch
@@ -18,6 +19,11 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import scipy.linalg
 from draw import Draw_MPC_point_stabilization_v1
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Float32MultiArray
+from gazebo_msgs.srv import SetModelState
+from gazebo_msgs.msg import ModelState
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -26,7 +32,8 @@ MODEL_ARCH = 'MLP'  # On of 'MLP' or 'CNNRESNET'
 # CNNRESNET: ResNet model with 18 Convolutional layers
 
 USE_GPU = False
-
+cur_rec_state_set = np.zeros(7)
+cur_cmd = np.zeros(2)
 
 class CNNResNet(torch.nn.Module):
     def __init__(self):
@@ -71,18 +78,9 @@ class DoubleIntegratorWithLearnedDynamics_nominal:
         dt = cs.MX.sym('dt',1)
         # u_combine = cs.vertcat(v, omega, dt)
         state = cs.vertcat(x, y, theta)
-        # state_dot = cs.MX.sym('state_dot',3)
-        # x_input = cs.vertcat(state,u,dt) # need a dt
-        
-        # print("1 in")
-        # ????
-        # ## YZX with dt
-        # rhs = [u[0]*cs.cos(state[2])*dt,u[1]*cs.sin(state[2])*dt,u[1]*dt] # u =[v,w] s = [x,y,theta]
-        # f = cs.Function('f',[state, u, dt],[cs.vcat(rhs)],['input_state','u','dt'],['next_state_nomial'])
-        # f_expl = f(state,u,0.01)
 
         ## YZX without dt
-        rhs = [0.05*v*cs.cos(theta),0.04*v*cs.sin(theta),0.07*omega] # u =[v,w] s = [x,y,theta]
+        rhs = [0.5*v*cs.cos(theta),v*cs.sin(theta),0.5*omega] # u =[v,w] s = [x,y,theta]
         f = cs.Function('f',[state, u],[cs.vcat(rhs)],['input_state','u'],['next_state_nomial'])
         f_expl = f(state, u) 
         x_dot = cs.MX.sym('x_dot', len(rhs))
@@ -104,8 +102,7 @@ class DoubleIntegratorWithLearnedDynamics_nominal:
         model.x_start = x_start
         model.constraints = cs.vertcat([])
         model.name = "wr"
-        
-        self. expl = f_expl
+
         return model
 # def f_calc_xdot(self,state,u):
 #     x = cs.MX.sym('x') # state, can be position 
@@ -228,10 +225,10 @@ class MPC_nominal:
 
         # Set constraints
         constraint = cs.types.SimpleNamespace()
-        constraint.v_max = 0.6
-        constraint.v_min = -0.6
-        constraint.omega_max = np.pi/4.0
-        constraint.omega_min = -np.pi/4.0
+        constraint.v_max = 2
+        constraint.v_min = -2
+        constraint.omega_max = 2
+        constraint.omega_min = -2
         constraint.x_min = -2.
         constraint.x_max = 50.
         constraint.y_min = -2.
@@ -267,47 +264,29 @@ class MPC_nominal:
         model_ac.name = model.name
         return model_ac
 
+def reset_model():
+    reset_client = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
+    model_state = ModelState()
+    model_state.model_name = "raigor"
+    model_state.pose.position.x = 0.0
+    model_state.pose.position.y = 0.0
+    model_state.pose.orientation.z = 0.0
+    try:
+        response = reset_client(model_state)
+        if response.success:
+            rospy.loginfo("reset successfull")
+        else:
+            rospy.logerr("Failed to reset")
+    except rospy.ServiceException as e:
+        rospy.logerr("Service call failed")
+
 
 def run():
+    reset_model()
     N = 10  # YZX notes:true predict horizon 
     Nsim = 100
-    # Get git commit hash for saving the model
-    git_version = ''
-    try:
-        git_version = subprocess.check_output(['git', 'describe', '--always']).strip().decode("utf-8")
-    except subprocess.CalledProcessError as e:
-        print(e.returncode, e.output)
-    print("The model will be saved using hash: %s" % git_version)
-    gp_name_dict = {"git": git_version, "model_name":"simple_sim_mlp"}
 
-    ## YZX add need to change each time after train
-    # pt_file = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict['git']), str("drag__motor_noise__noisy__no_payload.pt"))
-    # saved_dict = torch.load(pt_file)
-    saved_dict = torch.load("/home/ryan/raigor/train_ws/results/model_fitting/33a7439/drag__motor_noise__noisy__no_payload.pt")
-    if MODEL_ARCH == 'MLP':
-        learned_dyn_model = MLP(saved_dict['input_size'], saved_dict['hidden_size'], 
-                                saved_dict['output_size'], saved_dict['hidden_layers'], 'Tanh')
-        learn_model = NormalizedMLP(learned_dyn_model, torch.tensor(np.zeros((saved_dict['input_size'],))).float(),
-                                  torch.tensor(np.zeros((saved_dict['input_size'],))).float(),
-                                  torch.tensor(np.zeros((saved_dict['output_size'],))).float(),
-                                  torch.tensor(np.zeros((saved_dict['output_size'],))).float())
-        print("ok")
-        learn_model.load_state_dict(saved_dict['state_dict'])
-        learn_model.eval()
-
-    elif MODEL_ARCH == 'CNNRESNET':
-        learned_dyn_model = mc.TorchMLCasadiModuleWrapper(CNNResNet(), input_size=2, output_size=2)
-
-    if USE_GPU:
-        print('Moving Model to GPU')
-        learn_model = learn_model.to('cuda:0')
-        print('Model is on GPU')
-    ## YZX Test model firstly manually
-    # with torch.no_grad():
-    #     out = learn_model(torch.tensor([-0.070665, 0.00456055, 0.0165792, 2, 0.309718, 0.007]))
-    # print(out)
-    
-    model = DoubleIntegratorWithLearnedDynamics_nominal(learn_model)
+    model = DoubleIntegratorWithLearnedDynamics_nominal(None)
     MPC = MPC_nominal(model=model.model(), N=N)
     ocp = MPC.ocp()
     solver = MPC_nominal(model=model.model(), N=N).solver
@@ -332,26 +311,25 @@ def run():
     # solver.print_statistics()
 
     simX = []
+    simX_vel = []
     simX_b4 = []
+    simX_b4_vel = []
     simU = []
-    x_current = xt
+    simU_time = []
+    x_current = np.array([cur_rec_state_set[0], cur_rec_state_set[1], cur_rec_state_set[2]])
+    x_vel = np.array([cur_rec_state_set[4], cur_rec_state_set[5], cur_rec_state_set[6]])
     simX.append(xt)
+    simX_vel.append(np.array([0, 0, 0]))
     x_draw = []
     y_ref_draw = []
-    
-    # # pre set y_ref  is ok but not accurate
-    # xs = np.array([5.,5.,0])
-    # xs_between = np.concatenate((xs, np.zeros(2)))
-    # solver.set(N, 'yref', xs)
-    # for i in range(N):
-    #     solver.set(i, 'yref', xs_between)
+
     
     ## yzx init yref
     xs = np.array([7.,5.,0])
-    t = np.linspace(0, 100, 100)
+    t = np.linspace(0, 150, 80) # the more density the more accurate
         # print(t)
-    y_xpos = 3 * np.sin(0.0156*t)
-    y_ypos = 3 - 3 * np.cos(0.0156*t)
+    y_xpos = 7 * np.sin(0.0156*t)
+    y_ypos = 7 - 7 * np.cos(0.0156*t)
     y_yaw = 0.0156 * t
     yref = np.array([y_xpos,y_ypos, y_yaw]).T
     x_ref = []
@@ -360,6 +338,7 @@ def run():
     Nsim = 0
     i = 0
     goal = False
+    control = Twist()
     # print(x_ref)
     while(goal is False):
         # solve ocp
@@ -368,13 +347,15 @@ def run():
         index = findnearestIndex(x_current, x_ref)
         
         # print(index)
-        y_ref_draw.append(x_ref[index])
+        
         y_cur_ref = Set_y_ref(x_ref, index, N)
         if(y_cur_ref == -1):
             print("find goal!!!")
             goal = True
             break
         simX_b4.append(x_current)
+        simX_b4_vel.append(x_vel)
+        y_ref_draw.append(x_ref[index])
         y_cur_ref = np.array(y_cur_ref)
         # print(f"len(y_cur_ref):{len(y_cur_ref)}")
         y_e = y_cur_ref[len(y_cur_ref)-1]
@@ -389,67 +370,90 @@ def run():
         solver.set(0, 'lbx', x_current)
         solver.set(0, 'ubx', x_current)
         status = solver.solve()
-        solver.get_residuals()
-        solver.print_statistics()
+        # solver.get_residuals()
+        # solver.print_statistics()
         # print(solver.get_residuals())
         if status != 0 :
-            raise Exception('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
+            continue
+            # raise Exception('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
         
-        # print(solver.get(0, 'u'))
+        cur_u = np.array(solver.get(0, 'u'))
+        # add noise
+        # np.random.seed(Nsim)
+        # noise = np.random.normal(0, 1.5, 2)
+        # rospy.loginfo(f"noise 1:{noise[0]}\n")
+        # rospy.loginfo(f"noise 2:{noise[1]}\n")
+        # control.linear.x = cur_u[0] + noise[0]
+        # control.angular.z = cur_u[1] + noise[1]
+        control.linear.x = cur_u[0]
+        control.angular.z = cur_u[1] 
+        nn_msg.publish(control)
         simU.append(solver.get(0, 'u'))
-        # simulate system
-        integrator.set('x', x_current)
-        integrator.set('u', simU[i])
-
-        status_s = integrator.solve()
-        if status_s != 0:
-            raise Exception('acados integrator returned status {}. Exiting.'.format(status))
+        simU_time.append(rospy.Time.now().to_sec())
+    
+        x_current = np.array([cur_rec_state_set[0], cur_rec_state_set[1], cur_rec_state_set[2]])
+        x_vel = np.array([cur_rec_state_set[4], cur_rec_state_set[5], cur_rec_state_set[6], cur_rec_state_set[3]])
+        rospy.loginfo(f"x_current:{x_current}\n")
+        simX.append(x_current) 
+        simX_vel.append(x_vel)       
+        x_draw.append(x_current)
 
         # update
         x_l = []
         for i in range(N):
             x_l.append(solver.get(i, "x"))
-        print(f"solver get x:\n{x_l}")
-        x_current = integrator.get('x')
-        xdot = MPC.model
-        print(f"x_dot:{xdot}")
-        # x_current = solver.get(0, "x")
-        print(f"integrator_get x_current:{x_current}")
-        simX.append(x_current)        
-        x_draw.append(x_current)
+ 
         
-
+        
         elapsed = time.time() - now
         opt_times.append(elapsed)
         Nsim = Nsim+1
         i = Nsim
+        if i == 12000:
+            break
+        print(f"Nsim:{Nsim}")
 
 
     print(solver.get_stats('residuals'))
     simX = np.array(simX)
+    simX_vel = np.array(simX_vel)
     simU = np.array(simU)
+    simU_time = np.array(simU_time)
     simX_b4 = np.array(simX_b4)
-    # plt.show()
-    # Draw_MPC_point_stabilization_v1(rob_diam=0.3, init_state=xt, target_state=x_ref[len(x_ref)-1], robot_states=simX, )
-    # draw(x_draw,'x calc')
-    # draw(y_ref_draw,'y ref')
-    plt.show()
-    # for j in range(len(x)):
-    #     print(f'{x[j]}\n')
-    save_data2csv(simX[1:],simU,simX_b4)  
+    simX_b4_vel = np.array(simX_b4_vel)
+    y_ref_draw = np.array(y_ref_draw)
+
+    save_data2csv(simX[1:],simU,simX_b4,y_ref_draw,simX_vel[1:],simX_b4_vel,simU_time)  
     print(f'Mean iteration time with CNN ResNet Model: {1000*np.mean(opt_times):.1f}ms -- {1/np.mean(opt_times):.0f}Hz)')
 
 
-def save_data2csv(next, u, pst):
+def save_data2csv(next, u, pst, ref, next_vel, pst_vel,u_time):
+    
+    # print(f"next:{next.shape[0]}")
+    # print(f"u:{u.shape[0]}")
+    # print(f"pst:{pst.shape[0]}")
+    # print(f"pst:{next_vel.shape[0]}")
+    # print(f"pst:{pst_vel.shape[0]}")
     data = pd.DataFrame({'x_position_input': pst[:, 0],
                         'y_position_input': pst[:, 1],
                         'yaw_input': pst[:, 2],
+                        'vel_x_input':pst_vel[:,0],
+                        'vel_y_input':pst_vel[:,1],
+                        'vel_w_input':pst_vel[:,2],
                         'con_x_input': u[:, 0],
                         'con_z_input':u[:, 1],
                         'x_position_output': next[:,0],
                         'y_position_output': next[:,1],
-                        'yaw_output': next[:,2]})
-    data.to_csv("/home/ryan/raigor/train_ws/data/simplified_sim_dataset/train/dataset_digitalsim.csv")
+                        'yaw_output': next[:,2],
+                        'vel_x_output':next_vel[:,0],
+                        'vel_y_output':next_vel[:,1],
+                        'vel_w_output':next_vel[:,2],
+                        'x_ref': ref[:, 0],
+                        'y_ref': ref[:, 1],
+                        'yaw_ref': ref[:, 2],
+                        'con_time': u_time,
+                        'out_time':next_vel[:,3]})
+    data.to_csv("/home/ryan/raigor/train_ws/data/simplified_sim_dataset/train/dataset_gzsim_nominal.csv")
 
 def draw(data,label):
     x = []
@@ -469,12 +473,14 @@ def Set_y_ref(ref_path, idx, Horizon):
     min_idx = min(idx + Horizon, len(ref_path)-1)
     if(idx == len(ref_path)-1): 
         return -1
-    # print(min_idx)
+    print(f"idx:{idx}")
+    print(f"len(ref_path)-1:{len(ref_path)-1}")
     print(f"len(ref_path):{len(ref_path)}")
     print(f"idx+H:{idx + Horizon}")
     for i in range(idx, min_idx+1):
+        print(f"ref_path[i]:{ref_path[i]}")
         cur_ref_path.append(ref_path[i])
-    # print(len(cur_ref_path))
+    print(f"min_idx{min_idx}")
     return cur_ref_path
 
 
@@ -492,5 +498,25 @@ def findnearestIndex(cur_pos,ref_path):
             index = i
     return index
 
+
+
+def Callback_base(msg):
+    rospy.loginfo("msg got~!!!!!")
+    quaternion = msg.pose.pose.orientation
+    roll, pitch, yaw = tf.euler_from_quaternion([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
+    # rospy.loginfo(f"x pose{msg.pose.pose.position.x}")
+    cur_rec_state_set[0] = msg.pose.pose.position.x 
+    cur_rec_state_set[1] = msg.pose.pose.position.y 
+    cur_rec_state_set[2] = yaw
+    cur_rec_state_set[3] = rospy.Time.now().to_sec()
+    cur_rec_state_set[4] = msg.twist.twist.linear.x 
+    cur_rec_state_set[5] = msg.twist.twist.linear.y 
+    cur_rec_state_set[6] = msg.twist.twist.angular.z
+
+
 if __name__ == '__main__':
+    rospy.init_node("acados", anonymous=True)
+    rospy.Subscriber("/base_pose_ground_truth", Odometry, Callback_base)
+    nn_msg = rospy.Publisher('/cmd_vel', Twist, queue_size=10)  
+    rate = rospy.Rate(1)   
     run()

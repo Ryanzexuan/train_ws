@@ -56,6 +56,7 @@ class RawDataset(Dataset):
         # control input
         vel_x_u = ds['con_x_input']
         vel_z_u = ds['con_z_input']
+
         # state output
         state_pose_x_output = ds['x_position_output']
         state_pose_y_output = ds['y_position_output'] 
@@ -76,14 +77,15 @@ class RawDataset(Dataset):
 
         # time
         self.dt = dt
-        print(dt)
+        # print(dt)
         # state input
         self.state_pose_x_input = state_pose_x_input
         self.state_pose_y_input = state_pose_y_input
         self.state_orientation_y_input = state_orientation_y_input   
         # control input
-        self.vel_x_u = vel_x_u
-        self.vel_z_u = vel_z_u
+        self.vel_x_u = vel_x_u * cs.cos(state_orientation_y_input)
+        self.vel_y_u = vel_x_u * cs.sin(state_orientation_y_input)
+        self.vel_z_u = vel_z_u 
         # state output
         self.state_pose_x_output = state_pose_x_output
         self.state_pose_y_output = state_pose_y_output
@@ -96,27 +98,45 @@ class RawDataset(Dataset):
         self.res_x = self.state_pose_x_output - self.nomial_x
         self.res_y = self.state_pose_y_output - self.nomial_y
         self.res_yaw = self.state_orientation_y_output - self.nomial_yaw
+        # vel residual
+        self.res_vel_x = vel_x_out - self.vel_x_u
+        self.res_vel_y = vel_y_out - self.vel_y_u
+        self.res_vel_yaw = vel_w_out - self.vel_z_u
 
         # # calc the dynamic of state error (error rate) rather than state error itself   ### !!! 0.1 is control actual time not measurement time so it can be changed in the future
         self.res_x /= dt
         self.res_y /= dt
         self.res_yaw /= dt
-        # print(self.res_x[0])
+        # print(self.res_x)
         # print(self.res_y[0])
         # print(self.res_yaw[0])
+        self.res_vel_x /= dt
+        self.res_vel_y /= dt
+        self.res_vel_yaw /= dt
+
 
         self.vel_x_out = vel_x_out
         self.vel_y_out = vel_y_out
         self.vel_w_out = vel_w_out
-  
+
+
+    def prune(self,data):
+        print(f"data shape:{data.shape[1]}")
+        for i in range(data.shape[1]):
+            idx = np.where(data[:,i] > 50)
+            data = np.delete(data, idx, axis=0)
+        
+        return data
+        
+
     @property
     def x(self):
         return self.getx()
 
     def getx(self):
-        data = np.column_stack((self.state_pose_x_input,self.state_pose_y_input,self.state_orientation_y_input,
-                                self.vel_x_u, self.vel_z_u,self.dt)) # 6 dims
+        data = np.column_stack((self.state_pose_x_input,self.state_pose_y_input,self.state_orientation_y_input,self.vel_x_u, self.vel_z_u,self.dt)) # 6 dims
         # print(data.shape[1])
+        data = self.prune(data)
         return data
     
     @property
@@ -124,7 +144,8 @@ class RawDataset(Dataset):
         return self.gety()
     
     def gety(self):
-        data = np.column_stack((self.vel_x_out, self.vel_y_out, self.vel_w_out)) # 3 dims
+        data = np.column_stack((self.res_x, self.res_y, self.res_yaw)) # 3 dims
+        data = self.prune(data)
         return data
 
 
@@ -207,7 +228,7 @@ class NomialModel:
         u = self.u
         x = self.x
         dt =self.dt
-        rhs = [x[0]+u[0]*cs.cos(x[2])*dt,x[1]+u[1]*cs.sin(x[2])*dt,x[2]+u[1]*dt]
+        rhs = [x[0]+0.7*u[0]*cs.cos(x[2])*dt,x[1]+0.5*u[1]*cs.sin(x[2])*dt,x[2]+0.4*u[1]*dt]
         self.f = cs.Function('nomial', [x, u, dt], [cs.vcat(rhs)], ['x', 'u', 'dt'],['next_state_nomial'])    
 
     def calc_nomial(self):  

@@ -1,5 +1,9 @@
+import sys
+sys.path.append("/home/ryan/raigor/train_ws/src/")
+import rospy
 import casadi as cs
 import numpy as np
+import pandas as pd
 import torch
 import torchvision.models as models
 import ml_casadi.torch as mc
@@ -14,7 +18,10 @@ import tf.transformations as tf
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import scipy.linalg
-
+from draw import Draw_MPC_point_stabilization_v1
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Float32MultiArray
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -23,7 +30,8 @@ MODEL_ARCH = 'MLP'  # On of 'MLP' or 'CNNRESNET'
 # CNNRESNET: ResNet model with 18 Convolutional layers
 
 USE_GPU = False
-
+cur_rec_state_set = np.zeros(7)
+cur_cmd = np.zeros(2)
 
 class CNNResNet(torch.nn.Module):
     def __init__(self):
@@ -55,55 +63,60 @@ class MLP(mc.nn.MultiLayerPerceptron):
 class DoubleIntegratorWithLearnedDynamics:
     def __init__(self, learned_dyn):
         self.learned_dyn = learned_dyn
+        self.Bx = np.array([[0, 0.0, 0.0],
+                            [0.0, 0.0, 0.0],
+                            [0.0, 0.0, 0],
+                            [1.0, 0.0, 0.0],
+                            [0.0, 1.0, 0.0],
+                            [0.0, 0.0, 1]])
 
     def model(self):
-        ## YZX TBD s,s_dot,s_dot_dot dimension need to be changed 
-
-        s = cs.MX.sym('s', 3) # state, can be position 
-        s_dot = cs.MX.sym('s_dot', 3) # deriavtive of state, can be velocity
-        # s_dot_dot = cs.MX.sym('s_dot_dot', 3) # derivative again, can be acceleration or control input
-        u = cs.MX.sym('u', 2)
-        dt = cs.MX.sym('dt',1)
-        u_combine = cs.vertcat(u, dt)
-        state = cs.MX.sym('state',3)
-        state_dot = cs.MX.sym('state_dot',3)
-        x_input = cs.vertcat(state,u,dt) # need a dt
-
-        x_dot = cs.vertcat(s_dot)
-        print("1 in")
-        res_model = self.learned_dyn(x_input) # (f_a+mac(df_a,(vertcat(s, s_dot)-a),zeros(2x1))) 
-        # print(res_model)
-        p = self.learned_dyn.sym_approx_params(order=1, flat=True) # vertcat(a, f_a, vec(df_a)) 
-        # print(p)
-        parameter_values = self.learned_dyn.approx_params(np.array([0, 0, 0, 0, 0, 0]), flat=True, order=1) # obtain value:(a, f_a, vec(df_a)) ;   np.array([0, 0]) transfers to variable a;
+        s_dot_dim = self.learned_dyn.output_size
+        x_dim = self.learned_dyn.input_size
+    
+        x = cs.MX.sym('x') # state, can be position 
+        y = cs.MX.sym('y') # deriavtive of state, can be velocity
+        x_dot = cs.MX.sym('x_dot') # x linear vel
+        y_dot = cs.MX.sym('y_dot') # y linear vel
+        w_dot = cs.MX.sym('w_dot') # angular vel
+        previous_vel = cs.vertcat(x_dot, y_dot, w_dot)
         
-        ## YZX with dt
-        rhs = [u[0]*cs.cos(state[2]),u[1]*cs.sin(state[2]),u[1]] # u =[v,w] s = [x,y,theta]
-        f = cs.Function('f',[state, u],[cs.vcat(rhs)],['input_state','u'],['next_state_nomial'])
-        f_expl = res_model  # f_expl means the next state would be "f(s_dot,u) + f_a+mac(df_a,(vertcat(s, s_dot)-a)"
+        theta = cs.MX.sym('theta')
+        v = cs.MX.sym('v')
+        omega = cs.MX.sym('omega')
+        u = cs.vertcat(v, omega)
+        ctr_vel = cs.vertcat(v*cs.cos(theta), v*cs.sin(theta), omega)
+        # u_combine = cs.vertcat(v, omega, dt)
+        state = cs.vertcat(x, y, theta, x_dot, y_dot, w_dot)
+        input = cs.vertcat(ctr_vel, previous_vel)
+        res_model = cs.mtimes(self.Bx, self.learned_dyn(input))
+        print(f"res model :{res_model}")
+        print(f"res model shape is :{res_model.shape}")
+        # dynamics = cs.Function('vel_dot', [input], [res_model])
+        # self.dynamics = dynamics
 
-        
-        # ## YZX without dt
-        # rhs = [u[0]*cs.cos(state[2]),u[1]*cs.sin(state[2]),u[1]] # u =[v,w] s = [x,y,theta]
-        # f = cs.Function('f',[state, u],[cs.vcat(rhs)],['state','u'],['next_state_nomial'])
-        # f_expl = f(state,u) + res_model  # f_expl means the next state would be "f(s_dot,u) + f_a+mac(df_a,(vertcat(s, s_dot)-a)"
-        # print(f_expl)
-        
-        x_start = np.zeros((3))
+        f_expl = res_model 
+        s_dot = cs.MX.sym('s_dot', res_model.shape)     
+
+        print(f"state shape : {state.shape}")
+        x_start = np.zeros((x_dim))
 
         # store to struct
         model = cs.types.SimpleNamespace()
-        model.x = state 
-        model.xdot = state_dot
-        model.u = u_combine # combine time as input
+        model.x = state  # contains {x, y, theta, x_dot, y_dot, w_dot}
+        model.xdot = s_dot
+        # model.u = u_combine # with dt
+        model.u = u
         # model.dt = dt
         model.z = cs.vertcat([])
-        model.p = p
-        model.parameter_values = parameter_values
+        # model.p = cs.vertcat([])
+        # model.parameter_values = cs.vertcat([])
         model.f_expl = f_expl
+        model.f_impl = s_dot - f_expl
         model.x_start = x_start
         model.constraints = cs.vertcat([])
         model.name = "wr"
+
 
         return model
 
@@ -129,12 +142,12 @@ class MPC:
 
         # Get model
         model_ac = self.acados_model(model=model)
-        model_ac.p = model.p
+        # model_ac.p = model.p
 
         # Dimensions
-        nx = 3
-        nu = 3
-        ny = 3
+        nx = 6
+        nu = 2
+        ny = nx + nu
 
         # Create OCP object to formulate the optimization
         sim = AcadosSim()
@@ -163,12 +176,11 @@ class MPC:
 
         # Get model
         model_ac = self.acados_model(model=model)
-        model_ac.p = model.p
 
         # Dimensions
-        nx = 3
-        nu = 3
-        ny = 3
+        nx = 6
+        nu = 2
+        ny = nx + nu
 
         # Create OCP object to formulate the optimization
         ocp = AcadosOcp()
@@ -178,45 +190,83 @@ class MPC:
         ocp.dims.nu = nu
         ocp.dims.ny = ny
         ocp.solver_options.tf = t_horizon
-        
+
         # Initialize cost function
         ocp.cost.cost_type = 'LINEAR_LS'
         ocp.cost.cost_type_e = 'LINEAR_LS'
+        
+        # original QR 
+        # 已有的 Q 矩阵
+        Q_existing = np.array([[10.0, 0.0, 0.0],
+                            [0.0, 10.0, 0.0],
+                            [0.0, 0.0, 2]])
 
-        ocp.cost.W = np.diag([7, 2, 8])
+        # 新增变量的权重为 0
+        Q_additional = np.zeros((3, 3))
+
+        # 将 Q_existing 和 Q_additional 合并成一个 6x6 的矩阵
+        Q = np.block([[Q_existing, np.zeros((3, 3))],
+                    [np.zeros((3, 3)), Q_additional]])
+        R = np.array([[0.5, 0.0], [0.0, 0.5]])
+
+        # Q = np.array([[1.0, 0.0, 0.0], [0.0, 5.0, 0.0], [0.0, 0.0, .1]])
+        # R = np.array([[0.5, 0.0], [0.0, 0.05]])
+
+        ocp.cost.W = scipy.linalg.block_diag(Q, R)
+        ocp.cost.W_e = Q # not understand ???????
+        
         ocp.cost.Vx = np.zeros((ny, nx))
-        ocp.cost.Vx[:nx, :ny] = np.eye(nx)
+        ocp.cost.Vx[:nx, :nx] = np.eye(nx)
         ocp.cost.Vu = np.zeros((ny, nu))
+        ocp.cost.Vu[-nu:, -nu:] = np.eye(nu)
         ocp.cost.Vz = np.array([[]])
-        ocp.cost.Vx_e = np.zeros((ny, nx))
-        ocp.cost.W_e = np.zeros((3,3)) # not understand ???????
-        ocp.cost.yref_e = np.array([0., 0., 0.])
+        ocp.cost.Vx_e = np.eye(nx)
+        
+
 
         # Initial reference trajectory (will be overwritten)
-        ocp.cost.yref = np.zeros(3)
+        x_ref = np.zeros(nx)
+        u_ref = np.zeros(nu)
+        ocp.constraints.x0 = x_ref
+        ocp.cost.yref = np.concatenate((x_ref, u_ref))
+        ocp.cost.yref_e = x_ref
 
         # Initial state (will be overwritten)
         ocp.constraints.x0 = model.x_start
 
         # Set constraints
-        a_max = 10
-        ocp.constraints.lbu = np.array([-a_max, -a_max, -a_max])
-        ocp.constraints.ubu = np.array([a_max, a_max, a_max])
-        ocp.constraints.idxbu = np.array([0,1,2])
-
+        constraint = cs.types.SimpleNamespace()
+        constraint.v_max = 2
+        constraint.v_min = -2
+        constraint.omega_max = 2
+        constraint.omega_min = -2
+        constraint.x_min = -2.
+        constraint.x_max = 50.
+        constraint.y_min = -2.
+        constraint.y_max = 50.
+    
+        ocp.constraints.lbu = np.array([constraint.v_min, constraint.omega_min])
+        ocp.constraints.ubu = np.array([constraint.v_max, constraint.omega_max])
+        ocp.constraints.idxbu = np.array([0, 1])
+        ocp.constraints.lbx = np.array([constraint.x_min, constraint.y_min])
+        ocp.constraints.ubx = np.array([constraint.x_max, constraint.y_max])
+        ocp.constraints.idxbx = np.array([0, 1])
+        # new add
+        ocp.constraints.x0 = x_ref
+        ocp.cost.yref = np.concatenate((x_ref, u_ref))
+        ocp.cost.yref_e = x_ref
         # Solver options
         ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM'
         ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
         ocp.solver_options.integrator_type = 'ERK'
         ocp.solver_options.nlp_solver_type = 'SQP_RTI'
 
-        ocp.parameter_values = model.parameter_values
 
         return ocp
 
     def acados_model(self, model):
         model_ac = AcadosModel()
-        model_ac.f_impl_expr = model.xdot - model.f_expl
+        model_ac.f_impl_expr = model.f_impl
         model_ac.f_expl_expr = model.f_expl
         model_ac.x = model.x
         model_ac.xdot = model.xdot
@@ -225,23 +275,16 @@ class MPC:
         return model_ac
 
 
+
 def run():
     N = 10  # YZX notes:true predict horizon 
     Nsim = 100
     # Get git commit hash for saving the model
-    git_version = ''
-    try:
-        git_version = subprocess.check_output(['git', 'describe', '--always']).strip().decode("utf-8")
-    except subprocess.CalledProcessError as e:
-        print(e.returncode, e.output)
-    print("The model will be saved using hash: %s" % git_version)
-    gp_name_dict = {"git": git_version, "model_name":"simple_sim_mlp"}
-
-    ## YZX add need to change each time after train
-    # pt_file = os.path.join("/home/ryan/train_ws/results/model_fitting/", str(gp_name_dict['git']), str("drag__motor_noise__noisy__no_payload.pt"))
-    # saved_dict = torch.load(pt_file)
-    saved_dict = torch.load("/home/ryan/raigor/train_ws/results/model_fitting/33a7439/drag__motor_noise__noisy__no_payload.pt")
-    #saved_dict = torch.load("/home/ryan/raigor/train_ws/results/model_fitting/c7c30c3/simple_sim_mlp/drag__motor_noise__noisy__no_payload.pt")
+    ws_path = os.getcwd()
+    pt_name = 'ros_mlp.pt'
+    path = os.path.join(ws_path, 'mlp_fit_ros/results', pt_name)
+    print(f"path is {path}")
+    saved_dict = torch.load(path)
     if MODEL_ARCH == 'MLP':
         learned_dyn_model = MLP(saved_dict['input_size'], saved_dict['hidden_size'], 
                                 saved_dict['output_size'], saved_dict['hidden_layers'], 'Tanh')
@@ -249,7 +292,7 @@ def run():
                                   torch.tensor(np.zeros((saved_dict['input_size'],))).float(),
                                   torch.tensor(np.zeros((saved_dict['output_size'],))).float(),
                                   torch.tensor(np.zeros((saved_dict['output_size'],))).float())
-        print("ok")
+        print("load train model ok")
         learn_model.load_state_dict(saved_dict['state_dict'])
         learn_model.eval()
 
@@ -260,12 +303,11 @@ def run():
         print('Moving Model to GPU')
         learn_model = learn_model.to('cuda:0')
         print('Model is on GPU')
-    ## YZX Test model firstly manually
-    # with torch.no_grad():
-    #     out = learn_model(torch.tensor([-0.070665, 0.00456055, 0.0165792, 2, 0.309718, 0.007]))
-    # print(out)
+
     
+
     model = DoubleIntegratorWithLearnedDynamics(learn_model)
+    print("model init successfully")
     solver = MPC(model=model.model(), N=N).solver
     integrator = MPC(model=model.model(), N=N).simulator
 
@@ -277,91 +319,134 @@ def run():
         x_l.append(solver.get(i, "x"))
         u_l.append(solver.get(i, "u"))
         input_l = np.hstack((x_l, u_l))
-        # print(input_l.shape)
-    for i in range(20):
-        learned_dyn_model.approx_params(np.stack(input_l, axis=0), flat=True)
+
     print('Warmed up!')
 
     x = []
     y_ref = []
     ts = 1. / N
-    xt = np.array([0., 0., 0]) # boundary for x 
+    xt = np.zeros(6)# boundary for x 
     opt_times = []
     # solver.print_statistics()
 
-    simX = np.zeros((Nsim+1, 3))
-    simU = np.zeros((Nsim, 3))
+    simX = []
+    simU = []
     x_current = xt
-    simX[0, :] = xt.reshape(1, -1)
+    simX.append(xt)
     x_draw = []
     y_ref_draw = []
-
-
-    ## init yref
+    
+    
+    ## yzx init yref
+    xs = np.array([7.,5.,0])
     t = np.linspace(0, 100, 100)
         # print(t)
-    y_xpos = 5 * np.sin(0.0156*t)
-    y_ypos = 5 - 5 * np.cos(0.0156*t)
+    y_xpos =  7* np.sin(0.0156*t)
+    y_ypos = 7 - 7 * np.cos(0.0156*t)
     y_yaw = 0.0156 * t
     yref = np.array([y_xpos,y_ypos, y_yaw]).T
     x_ref = []
     for t, ref in enumerate(yref):
         x_ref.append(ref)
-    print(x_ref)
-    for i in range(Nsim):
+    Nsim = 0
+    i = 0
+    goal = False
+    # print(x_ref)
+    while(goal is False):
         # solve ocp
         now = time.time()
-        ## set yref
+        # find near ref path
+        # x_ref = data_ref_sim
         index = findnearestIndex(x_current, x_ref)
+        print(f"nearest index:{index}")
+
+        # set y_ref
         y_ref_draw.append(x_ref[index])
         y_cur_ref = Set_y_ref(x_ref, index, N)
-        for j in range(len(y_cur_ref)):
-            solver.set(j, "yref", y_cur_ref[j])
-
+        if(y_cur_ref == -1):
+            print("find goal!!!")
+            goal = True
+            break
+        y_cur_ref = np.array(y_cur_ref)
+        new_col = np.zeros((y_cur_ref.shape[0], 3))
+        y_cur_ref = np.hstack((y_cur_ref, new_col))
+        print(f"len(y_cur_ref):{len(y_cur_ref)}")
+        y_e = y_cur_ref[len(y_cur_ref)-1]
+        solver.set(N, 'yref', y_cur_ref[len(y_cur_ref)-1])
+        for j in range(len(y_cur_ref)-1):
+            xs_between = np.concatenate((y_cur_ref[j], np.zeros(2)))
+            solver.set(j, "yref", xs_between)
+        if(N-len(y_cur_ref) > 0):
+            for k in range(N-len(y_cur_ref)):
+                solver.set(len(y_cur_ref)+k, "yref", np.concatenate((y_e, np.zeros(2))))
+        
         ##  set inertial (stage 0)
+        # x_current = data_pose_sim[i] # let real sim data be the pose
         solver.set(0, 'lbx', x_current)
         solver.set(0, 'ubx', x_current)
         status = solver.solve()
-
+        # solver.get_residuals()
+        # solver.print_statistics()
         if status != 0 :
             raise Exception('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
-
-        simU[i, :] = solver.get(0, 'u')
+        
+        # print(solver.get(0, 'u'))
+        simU.append(solver.get(0, 'u'))
+        print(f"solver get u: {solver.get(0, 'u')}")
         # simulate system
         integrator.set('x', x_current)
-        integrator.set('u', simU[i, :])
+        integrator.set('u', simU[i])
 
         status_s = integrator.solve()
         if status_s != 0:
             raise Exception('acados integrator returned status {}. Exiting.'.format(status))
 
         # update
+        
         x_current = integrator.get('x')
-        simX[i+1, :] = x_current
+        simX.append(x_current)        
         x_draw.append(x_current)
+
+        # update NN params into ocp solver params
         # update MLP part
         x_l = []
         input_l = []
-        for i in range(N):
-            x_l.append(solver.get(i, "x"))
-            u_l.append(solver.get(i, "u"))
-            input_l.append(np.hstack((x_l[i], u_l[i])))
-        params = learned_dyn_model.approx_params(np.stack(input_l, axis=0), flat=True)
-        for i in range(N):
-            solver.set(i, "p", params[i])
+        # for i in range(N):
+        #     x_l.append(solver.get(i, "x"))
+        #     u_l.append(solver.get(i, "u"))
+        #     input_l.append(np.hstack((x_l[i], u_l[i])))
+        # params = learned_dyn_model.approx_params(np.stack(input_l, axis=0), flat=True)
+        # for i in range(N):
+        #     solver.set(i, "p", params[i])
 
+        
+        # calc end time for each epoch
         elapsed = time.time() - now
         opt_times.append(elapsed)
-    
-    plt.figure()
-    plt.grid(True)
-    draw(x_draw,'x calc')
-    draw(y_ref_draw,'y ref')
-    plt.show()
+        Nsim = Nsim+1
+        i = Nsim
+        if i==1000:
+            break
+        print(f"Nsim:{Nsim}")
 
+
+    print(solver.get_stats('residuals'))
+    # print(f"x_current:{x_current}")
+    # print(f"ref:{x_ref}")
+    # plt.figure()
+    # plt.grid(True)
+    simX = np.array(simX)
+    simU = np.array(simU)
+    # plt.show()
+    Draw_MPC_point_stabilization_v1(rob_diam=0.3, init_state=xt, target_state=x_ref[len(x_ref)-1], robot_states=simX, )
+    # draw(x_draw,'pose with mlp')
+    # draw(y_ref_draw,'y ref')
+    # draw(data_ref_sim, 'sim y ref')
+    # draw(data_pose_sim, 'pose without mlp')
+    plt.show()
     # for j in range(len(x)):
     #     print(f'{x[j]}\n')
-        
+     
     print(f'Mean iteration time with CNN ResNet Model: {1000*np.mean(opt_times):.1f}ms -- {1/np.mean(opt_times):.0f}Hz)')
 
 def draw(data,label):
@@ -379,12 +464,15 @@ def draw(data,label):
         
 def Set_y_ref(ref_path, idx, Horizon):
     cur_ref_path = []
-    min_idx = min(idx + Horizon, len(ref_path))
+    min_idx = min(idx + Horizon, len(ref_path)-1)
+    if(idx == len(ref_path)-1): 
+        return -1
     # print(min_idx)
-
-    for i in range(idx, min_idx):
+    # print(f"len(ref_path):{len(ref_path)}")
+    # print(f"idx+H:{idx + Horizon}")
+    for i in range(idx, min_idx+1):
         cur_ref_path.append(ref_path[i])
-    print(len(cur_ref_path))
+    # print(len(cur_ref_path))
     return cur_ref_path
 
 
@@ -403,4 +491,5 @@ def findnearestIndex(cur_pos,ref_path):
     return index
 
 if __name__ == '__main__':
+    
     run()
