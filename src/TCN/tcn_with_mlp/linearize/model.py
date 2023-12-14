@@ -8,12 +8,19 @@ class NormalizedTCN(mc.TorchMLCasadiModule):
     def __init__(self, model):
         super().__init__()
         self.model = model
-        
+        self.input_size = self.model.input_size
+        self.output_size = self.model.output_size
+
+
+    def forward(self, x):
+        return self.model(x) 
 
 
 class TCN_withMLP(nn.Module):
     def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
         super(TCN_withMLP, self).__init__()
+        self.input_size = input_size
+        self.output_size = output_size
         self.tcn = TemporalConvNet(input_size, num_channels, kernel_size, dropout=dropout)
         self.linear = MLP(num_channels[-1], output_size)
 

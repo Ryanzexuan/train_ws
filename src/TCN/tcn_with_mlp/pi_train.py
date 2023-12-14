@@ -15,7 +15,7 @@ from tcn_data import TrajectoryDataset
 
 
 parser = argparse.ArgumentParser(description='Sequence Modeling')
-parser.add_argument('--lambda_value', type=float, default=0.7,
+parser.add_argument('--lambda_value', type=float, default=0.2,
                      help='hyperparameter for PI Loss (default=0.7)')
 parser.add_argument('--dropout', type=float, default=0.3,
                     help='dropout applied to layers (default: 0.3)')
@@ -41,16 +41,28 @@ data_path = os.path.join(cur_path + '/data/data2.csv')
 print(f'data_path:{data_path}')
 ## To be done
 def physics_loss(out, input):
-    # print(f"out:{out}")
-    # print(f"int:{input}")
-    return 0
+    v_in = input[:, -1, 3]
+    w_in = input[:, -1, 4]
+    theta_in = input[:, -1, 5]
+    # output
+    vx_out = out[:, :, 0]
+    vy_out = out[:, :, 1]
+    w_out = out[:, :, 2]
+    
+    v_x_nominal = torch.unsqueeze(v_in * torch.cos(theta_in), 1)
+    v_y_nominal = torch.unsqueeze(v_in * torch.sin(theta_in), 1)
+    w_nominal = torch.unsqueeze(w_in, 1)
+    nominal = torch.cat([v_x_nominal.unsqueeze(1), v_y_nominal.unsqueeze(1), w_nominal.unsqueeze(1)], dim=2)
+    
+    nominal_critic = nn.MSELoss()
+    loss = nominal_critic(out, nominal)
+    print(f'loss:{loss}')
+    return loss
 
 def train():
     rec_file = data_path
     raw_data  = pd.read_csv(rec_file)
-    idx_data = raw_data['vel_x_input']
-    idx = np.array(np.where(idx_data == 0))
-    print(f"idx:{idx}")
+    
     print(f'data:{raw_data}')
     # state
     raw_x = np.array(raw_data['x_position_input'])
@@ -68,6 +80,9 @@ def train():
     raw_u_w = np.array(raw_data['con_z_input'])
     
     # time_sequence = np.column_stack((raw_x, raw_y, raw_yaw, raw_v, raw_w))
+    idx_data = raw_data['vel_x_input'][:3000]
+    idx = np.array(np.where(idx_data == 0))
+    print(f"idx:{idx}")
     time_sequence = np.column_stack((raw_x_dot, raw_y_dot, raw_yaw_dot, raw_u_v, raw_u_w, raw_yaw)) # with control
     # time_sequence = np.column_stack((raw_x_dot, raw_y_dot, raw_yaw_dot))[:3000] # with no control
 
@@ -122,6 +137,7 @@ def train():
             # print(f"ground truth: {target_data.shape}\n")
             # print(f"net out: {output.shape}\n")
             loss = criterion(output, target_data) + lambda_v * physics_loss(output, input_data)
+            # print(f'loss:{loss}')
             loss.backward()
             optimizer.step()
         losses.append(loss.item())
@@ -143,7 +159,7 @@ def train():
                 'kernel_size': kernel_size,
                 'dropout': dropout
             }
-    save_file_path = os.path.join(cur_path + '/results/tcn_withyaw.pt')
+    save_file_path = os.path.join(cur_path + '/results/PItcn_withyaw.pt')
 
     torch.save(save_dict, save_file_path)
 

@@ -454,7 +454,7 @@ def save_data2csv(next, u, pst, ref, next_vel, pst_vel,u_time):
                         'yaw_ref': ref[:, 2],
                         'con_time': u_time,
                         'out_time':next_vel[:,3]})
-    data.to_csv("/home/ryan/raigor/train_ws/src/TCN/tcn_with_mlp/data/test/dataset_gzsim_nominal.csv")
+    data.to_csv("/home/ryan/raigor/train_ws/src/TCN/tcn_with_mlp/data/test/uneven_mpc.csv")
 
 def draw(data,label):
     x = []

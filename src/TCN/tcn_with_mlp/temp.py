@@ -57,6 +57,18 @@ def nominal_calc(input):
     # print(f'v_y:{v_y}')
     # print(f'w:{w}')
     return v_x,v_y,w
+def nominal_loss_calc(vx, vy, w, real_data):
+    print(f'real_data:{real_data.shape}')
+    print(vx.unsqueeze(1).shape)
+    nominal = torch.cat([vx.unsqueeze(1), vy.unsqueeze(1), w.unsqueeze(1)], dim=1)
+    print(f'nominal:{nominal.shape}')
+    nominal_critic = nn.MSELoss()
+    print(f'data:{nominal.shape},{torch.tensor(real_data[:, :3]).shape}')
+    out2 = torch.tensor(real_data[:, :3]).to('cuda:0')
+    out1 = nominal.to('cuda:0')
+
+    loss = nominal_critic(out1, out2)
+    return loss
 
 def test():
     rec_file = data_path
@@ -141,67 +153,35 @@ def test():
         print(f"data_traj[start]:{data_traj[start]}")
         print(f"real_data[start]:{real_data[0]}")
         print(f'actual_data[start]:{actual_data[0]}')
-        
-        with torch.no_grad():
-            # 假设你有一个输入序列 input_sequence_tensor
-            predicted_sequence = model(test).squeeze()
-            # print(f"Predicted Sequence:{predicted_sequence}")
-            # print(f"Predicted output:{predicted_sequence}")\
-        # Record Losses
-        for i, item in enumerate(predicted_sequence):
-            loss = criterion(item, torch.tensor(test_output[i, :args.n_out]))
-            # print(f'i {i}')
-            # print(f'predict:{item}')
-            # print(f'actual value:{test_output[i][:3]}')
-            # print(f'losses:{loss}')
-            losses.append(torch.sqrt(loss))
-        
-        # 绘制损失曲线
-        plt.figure(figsize=(12, 6))
-        plt.subplot(2, 2, 1)  # 第一个子图用于损失曲线
-        plt.plot(losses)
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.title("Training Loss")
+    
 
         # 绘制实际数据和预测数据
-        predicted_data = predicted_sequence.numpy()  # 预测数据
         print(f'size of actual data:{real_data.shape[0]}')
-        print(f'size of predict data:{predicted_data.shape[0]}')
-        vx,vy,w = nominal_calc(test)
-        # print(f"Predicted output:{predicted_data}")
-        plt.subplot(2, 2, 2)  # 第二个子图用于实际和预测数据
-        plt.plot(real_data[:, 0], label="Actual x", marker='o')
-        plt.plot(predicted_data[:, 0], linestyle='--', label="Predicted x", marker='x')
-        plt.plot(vx.numpy(), linestyle='--', label="Nominal x", marker='*')
-        plt.xlabel("Time Step")
-        plt.ylabel("Value")
-        plt.title("Actual vs. Predicted Data (x)")
-
-        plt.subplot(2, 2, 3) 
-        plt.plot(real_data[:, 1], label="Actual y", marker='o')
-        plt.plot(predicted_data[:, 1], linestyle='--', label="Predicted y", marker='x')
-        plt.plot(vy.numpy(), linestyle='--', label="Nominal y", marker='*')
-        plt.xlabel("Time Step")
-        plt.ylabel("Value")
-        plt.title("Actual vs. Predicted Data (y)")
-
-
-        plt.subplot(2, 2, 4) 
-        plt.plot(real_data[:, 2], label="Actual z", marker='o')
-        plt.plot(predicted_data[:, 2], linestyle='--', label="Predicted z", marker='x')
-        plt.plot(w.numpy(), linestyle='--', label="Nominal w", marker='*')
-        plt.xlabel("Time Step")
-        plt.ylabel("Value")
-        plt.title("Actual vs. Predicted Data (z)")
-        plt.legend()
-
-
-        plt.suptitle(f"start:{start}, end:{start+test_num}")
-        plt.tight_layout()  # 调整子图布局，使其更清晰
-        plt.show()
+        v_x,v_y,w= nominal_calc(test)
+        loss = nominal_loss_calc(v_x,v_y,w,real_data)
+        # print(f'test:{test.shape}')
+        # print(f'vx:{nominal.shape}')
+        print(f'loss:{loss.shape}')
 
 
 
 if __name__ == "__main__":
     test()
+
+
+# import torch
+# # 假设 v_x_nominal、v_y_nominal、w_nominal 是已经定义好的张量
+# v_x_nominal = torch.rand([128, 1])
+# v_y_nominal = torch.rand([128, 1])
+# w_nominal = torch.rand([128, 1])
+
+# # 使用 unsqueeze 在维度1上添加维度
+# # v_x_nominal = torch.unsqueeze(v_x_nominal, 1)
+# # v_y_nominal = torch.unsqueeze(v_y_nominal, 1)
+# # w_nominal = torch.unsqueeze(w_nominal, 1)
+
+# # 使用 torch.cat 在维度1上拼接这三个张量
+# result_tensor = torch.cat([v_x_nominal.unsqueeze(1), v_y_nominal.unsqueeze(1), w_nominal.unsqueeze(1)], dim=2)
+
+# # 打印结果的形状
+# print("结果形状:", result_tensor.shape)
