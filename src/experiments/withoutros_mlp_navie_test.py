@@ -309,7 +309,7 @@ def run():
     model = DoubleIntegratorWithLearnedDynamics(learn_model)
     print("model init successfully")
     solver = MPC(model=model.model(), N=N).solver
-    integrator = MPC(model=model.model(), N=N).simulator
+    integrator = MPC(model=model.model(), N=Nyaobuiya).simulator
 
     print('Warming up model...')
     x_l = []

@@ -34,7 +34,7 @@
 #include "acados_c/sim_interface.h"
 #include "acados_c/external_function_interface.h"
 
-#define WR_NX     6
+#define WR_NX     3
 #define WR_NZ     0
 #define WR_NU     2
 #define WR_NP     0

@@ -221,7 +221,7 @@ ocp_nlp_dims* wr_acados_create_2_create_and_set_dimensions(wr_solver_capsule* ca
     nbx[0]  = NBX0;
     nsbx[0] = 0;
     ns[0] = NS - NSBX;
-    nbxe[0] = 6;
+    nbxe[0] = 3;
     ny[0] = NY0;
 
     // terminal - common
@@ -389,8 +389,8 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     W_0[0+(NY0) * 0] = 10;
     W_0[1+(NY0) * 1] = 10;
     W_0[2+(NY0) * 2] = 2;
-    W_0[6+(NY0) * 6] = 0.5;
-    W_0[7+(NY0) * 7] = 0.5;
+    W_0[3+(NY0) * 3] = 0.5;
+    W_0[4+(NY0) * 4] = 0.5;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, 0, "W", W_0);
     free(W_0);
     double* W = calloc(NY*NY, sizeof(double));
@@ -398,8 +398,8 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     W[0+(NY) * 0] = 10;
     W[1+(NY) * 1] = 10;
     W[2+(NY) * 2] = 2;
-    W[6+(NY) * 6] = 0.5;
-    W[7+(NY) * 7] = 0.5;
+    W[3+(NY) * 3] = 0.5;
+    W[4+(NY) * 4] = 0.5;
 
     for (int i = 1; i < N; i++)
     {
@@ -418,15 +418,12 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     Vx_0[0+(NY0) * 0] = 1;
     Vx_0[1+(NY0) * 1] = 1;
     Vx_0[2+(NY0) * 2] = 1;
-    Vx_0[3+(NY0) * 3] = 1;
-    Vx_0[4+(NY0) * 4] = 1;
-    Vx_0[5+(NY0) * 5] = 1;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, 0, "Vx", Vx_0);
     free(Vx_0);
     double* Vu_0 = calloc(NY0*NU, sizeof(double));
     // change only the non-zero elements:
-    Vu_0[6+(NY0) * 0] = 1;
-    Vu_0[7+(NY0) * 1] = 1;
+    Vu_0[3+(NY0) * 0] = 1;
+    Vu_0[4+(NY0) * 1] = 1;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, 0, "Vu", Vu_0);
     free(Vu_0);
     double* Vx = calloc(NY*NX, sizeof(double));
@@ -434,9 +431,6 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     Vx[0+(NY) * 0] = 1;
     Vx[1+(NY) * 1] = 1;
     Vx[2+(NY) * 2] = 1;
-    Vx[3+(NY) * 3] = 1;
-    Vx[4+(NY) * 4] = 1;
-    Vx[5+(NY) * 5] = 1;
     for (int i = 1; i < N; i++)
     {
         ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "Vx", Vx);
@@ -447,8 +441,8 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     double* Vu = calloc(NY*NU, sizeof(double));
     // change only the non-zero elements:
     
-    Vu[6+(NY) * 0] = 1;
-    Vu[7+(NY) * 1] = 1;
+    Vu[3+(NY) * 0] = 1;
+    Vu[4+(NY) * 1] = 1;
 
     for (int i = 1; i < N; i++)
     {
@@ -461,9 +455,6 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     Vx_e[0+(NYN) * 0] = 1;
     Vx_e[1+(NYN) * 1] = 1;
     Vx_e[2+(NYN) * 2] = 1;
-    Vx_e[3+(NYN) * 3] = 1;
-    Vx_e[4+(NYN) * 4] = 1;
-    Vx_e[5+(NYN) * 5] = 1;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, N, "Vx", Vx_e);
     free(Vx_e);
 
@@ -477,9 +468,6 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     idxbx0[0] = 0;
     idxbx0[1] = 1;
     idxbx0[2] = 2;
-    idxbx0[3] = 3;
-    idxbx0[4] = 4;
-    idxbx0[5] = 5;
 
     double* lubx0 = calloc(2*NBX0, sizeof(double));
     double* lbx0 = lubx0;
@@ -492,14 +480,11 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     free(idxbx0);
     free(lubx0);
     // idxbxe_0
-    int* idxbxe_0 = malloc(6 * sizeof(int));
+    int* idxbxe_0 = malloc(3 * sizeof(int));
     
     idxbxe_0[0] = 0;
     idxbxe_0[1] = 1;
     idxbxe_0[2] = 2;
-    idxbxe_0[3] = 3;
-    idxbxe_0[4] = 4;
-    idxbxe_0[5] = 5;
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "idxbxe", idxbxe_0);
     free(idxbxe_0);
 

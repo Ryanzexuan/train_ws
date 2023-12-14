@@ -36,12 +36,12 @@
 #include "acados_c/ocp_nlp_interface.h"
 #include "acados_c/external_function_interface.h"
 
-#define WR_NX     6
+#define WR_NX     3
 #define WR_NZ     0
 #define WR_NU     2
 #define WR_NP     0
 #define WR_NBX    2
-#define WR_NBX0   6
+#define WR_NBX0   3
 #define WR_NBU    2
 #define WR_NSBX   0
 #define WR_NSBU   0
@@ -57,9 +57,9 @@
 #define WR_NG     0
 #define WR_NBXN   0
 #define WR_NGN    0
-#define WR_NY0    8
-#define WR_NY     8
-#define WR_NYN    6
+#define WR_NY0    5
+#define WR_NY     5
+#define WR_NYN    3
 #define WR_N      10
 #define WR_NH     0
 #define WR_NPHI   0

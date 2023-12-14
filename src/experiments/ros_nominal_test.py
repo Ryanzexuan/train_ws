@@ -317,9 +317,9 @@ def run():
     simU = []
     simU_time = []
     x_current = np.array([cur_rec_state_set[0], cur_rec_state_set[1], cur_rec_state_set[2]])
-    x_vel = np.array([cur_rec_state_set[4], cur_rec_state_set[5], cur_rec_state_set[6]])
+    x_vel = np.array([cur_rec_state_set[4], cur_rec_state_set[5], cur_rec_state_set[6], cur_rec_state_set[3]])
     simX.append(xt)
-    simX_vel.append(np.array([0, 0, 0]))
+    simX_vel.append(np.array([0, 0, 0, 0]))
     x_draw = []
     y_ref_draw = []
 
@@ -415,6 +415,7 @@ def run():
 
 
     print(solver.get_stats('residuals'))
+    print(simX_vel)
     simX = np.array(simX)
     simX_vel = np.array(simX_vel)
     simU = np.array(simU)
@@ -453,7 +454,7 @@ def save_data2csv(next, u, pst, ref, next_vel, pst_vel,u_time):
                         'yaw_ref': ref[:, 2],
                         'con_time': u_time,
                         'out_time':next_vel[:,3]})
-    data.to_csv("/home/ryan/raigor/train_ws/data/simplified_sim_dataset/train/dataset_gzsim_nominal.csv")
+    data.to_csv("/home/ryan/raigor/train_ws/src/TCN/tcn_with_mlp/data/test/dataset_gzsim_nominal.csv")
 
 def draw(data,label):
     x = []
