@@ -21,7 +21,7 @@ parser.add_argument('--dropout', type=float, default=0.3,
                     help='dropout applied to layers (default: 0.3)')
 parser.add_argument('--kernel_size', type=int, default=3,
                     help='kernel size (default: 3)')
-parser.add_argument('--n_input', type=int, default=6,
+parser.add_argument('--n_input', type=int, default=5,
                     help='input dimension (default: 3)')
 parser.add_argument('--n_out', type=int, default=3,
                     help='output dimension (default: 3)')
@@ -47,11 +47,20 @@ pt_path_withoutPI = os.path.join(cur_path + '/results/tcn_withyaw.pt')
 print(f'data_path:{data_path}')
 # print(f'pt_path:{pt_path}')
 ### ctrl + yaw + PI loss : 111 means has all
-saved_dict_100 = torch.load(pt_path_withoutYaw)
-saved_dict_110 = torch.load(pt_path_withoutPI)
+# saved_dict_100 = torch.load(pt_path_withoutYaw) # input 5
+# saved_dict_110 = torch.load(pt_path_withoutPI)
 saved_dict_111 = torch.load(pt_path_withPI)
 
+save_dict = saved_dict_111
 
+class data_character():
+    def __init__(self, sequence_len, input_size, output_size, predict_horizon=2):
+        super(data_character, self).__init__()
+        print(f'inputsize:{input_size}')
+        self.row_len = sequence_len
+        self.col_len = input_size
+        self.out_len = output_size
+        self.pre_len = predict_horizon
 
 def nominal_calc(input):
     # print(f'input:{input}')
@@ -82,6 +91,44 @@ def nominal_loss_calc(vx, vy, w, real_data):
     print(f'loss:{len(loss)}')
     return loss
 
+def divide_params(params, data):
+    row_len = data.row_len
+    col_len = data.col_len
+    out_len = data.out_len
+    divide1 = col_len
+    divide2 = col_len + out_len
+    print(f'divide1:{divide1}')
+    print(f'divide2:{divide2}')
+    a = params[:, :col_len*row_len].reshape(row_len, col_len)
+    f_a = params[:, col_len*row_len : col_len*row_len + out_len]
+    df_a = params[:, col_len*row_len + out_len:].reshape(out_len, row_len, col_len)
+    print(f'a:{a}')
+    print(f'fa:{f_a}')
+    print(f'dfa:{df_a}')
+    return a, f_a, df_a
+
+def linear_calc(a, f_a, df_a, x):
+    delta = x - a
+    original_f_delta = df_a * delta
+    f_delta = np.sum(df_a * delta, axis=(1, 2))
+    f = f_a + f_delta
+    # print(f'original f_delta:{df_a * delta}')
+    # print(f'f_delta:{f_delta}')
+    return f
+
+def calc_linear_whole(model, data, data_info):
+    for item in data[::data_info.pre_len]:
+        print(f'item:{item}')
+        # print(f'model:{model(item.unsqueeze(0))}')
+        params = model.approx_params(item.unsqueeze(0), flat=True, order=1)# obtain value:(a, f_a, vec(df_a))
+        a, f_a, df_a = divide_params(params, data_info)
+        print(f'a:{a}')
+        print(f'f_A:{f_a}')
+        a = a[1:,:]
+        new_a = np.vstack((a, f_a))
+        print(f'new_a:{new_a}')
+        # linear_calc(a, f_a, df_a, data)
+    return 0
 
 def test():
     rec_file = data_path
@@ -109,7 +156,7 @@ def test():
         data_length = 1000 # whole data length
         sequence_length = 5 # net input length
 
-        data_traj_100 = TrajectoryDataset(time_sequence_noyaw, sequence_length, idx, saved_dict_100['output_size'])
+        data_traj_100 = TrajectoryDataset(time_sequence_noyaw, sequence_length, idx, save_dict['output_size'])
         data_loader_100 = DataLoader(data_traj_100, batch_size=128, shuffle=True)
 
 
@@ -122,49 +169,47 @@ def test():
         kernel_size = 3
         dropout = 0.3
         # print(saved_dict['num_channels'])
-        
-        
+        print(f'I am here !!!!')
+        data_info = None
+        data_info = data_character(sequence_length, input_size, output_size)
         ## Model 100 read
-        model_100 = TCN_withMLP(input_size=saved_dict_100['input_size'], output_size=saved_dict_100['output_size'], 
-                            num_channels=saved_dict_100['num_channels'], kernel_size=saved_dict_100['kernel_size'], dropout=saved_dict_100['dropout'])
-        model_100.load_state_dict(saved_dict_100['state_dict'])
+        model_100 = TCN_withMLP(input_size=save_dict['input_size'], output_size=save_dict['output_size'], 
+                            num_channels=save_dict['num_channels'], kernel_size=save_dict['kernel_size'], dropout=save_dict['dropout'])
+        model_100.load_state_dict(save_dict['state_dict'])
         # Set evaluate mode
         # model_100.eval()  
         model = NormalizedTCN(model_100)
         model.eval()
 
-        
-        # input:
-        # input:[[ 0.00000e+00  0.00000e+00  0.00000e+00  0.00000e+00  0.00000e+00]
-        #  [-9.21757e-04 -2.71761e-04  3.06975e-03  4.77448e-01  1.38134e-01]
-        #  [ 6.90237e-03 -7.76679e-04  1.46043e-02  4.77406e-01  1.38061e-01]
-        #  [ 4.11539e-02 -2.25573e-03  5.54318e-02  4.76764e-01  1.37465e-01]
-        #  [ 8.36845e-02 -3.78852e-03  7.14965e-02  4.75102e-01  1.36501e-01]]
-        # out:tensor([[ 0.1257, -0.0079,  0.0219,  0.6252,  0.8857]])
-        #
+        test_num = 10
+        start = 2
+        test_100 = []
+        for i in range(test_num):
+            print(f'start:{start}')
+            test_input_100,real_out = data_traj_100[i + start]      
+            test_100.append(test_input_100)
+        test_100 = torch.tensor(np.array(test_100))
         with torch.no_grad():
-            input, output = data_traj_100[0]
-            print(f'input:{np.array(input)}')
-            print(f'out:{output}')
-            print(f'model value :{model(torch.tensor(input).unsqueeze(0))}')
-            input = torch.tensor(input).unsqueeze(0)
-            vel = cs.MX.sym('vel', 3)
-            u = cs.MX.sym('u', 2)
-            input_def = cs.vertcat(vel, u)
+            calc_linear_whole(model, test_100, data_info)
+   
+        # with torch.no_grad():
+        #     input, output = data_traj_100[0]
+        #     print(f'input:{np.array(input)}')
+        #     print(f'out:{output}')
+        #     print(f'model value :{model(torch.tensor(input).unsqueeze(0))}')
+        #     input = torch.tensor(input).unsqueeze(0)
+        #     vel = cs.MX.sym('vel', 3)
+        #     u = cs.MX.sym('u', 2)
+        #     input_def = cs.vertcat(vel, u)
             
-            linear_model = model.approx(input_def)
-            p = model.sym_approx_params(order=1, flat=True)
-            params = model.approx_params(input, flat=True, order=1)# obtain value:(a, f_a, vec(df_a))
-            a = params
-            f_a = params  
-            df_a = params
-            
-            print(f'linear model:{linear_model}')
-            print(f'p:{p}')
-            print(f'params:{params}')
-            print(f'a:{a}')
-            print(f'f_a:{f_a}')
-            print(f'df_a:{df_a}')
+        #     linear_model = model.approx(input_def)
+        #     p = model.sym_approx_params(order=1, flat=True)
+        #     params = model.approx_params(input, flat=True, order=1)# obtain value:(a, f_a, vec(df_a))
+        #     a, f_a, df_a = divide_params(params, data_info)
+        #     print(f'linear model:{linear_model}')
+        #     print(f'p:{p}')
+        #     print(f'params:{params}')
+        #     linear_calc(a, f_a, df_a, data_traj_100)
         # N = 100
 
         # criterion = nn.MSELoss()

@@ -29,7 +29,7 @@ parser.add_argument('--batch_size', type=int, default=128,
                     help='batchsize (default: 128)')
 parser.add_argument('--tcn_channels', nargs='+', type=int, default=[16,16,16],
                     help='dropout applied to layers (default: [16,16,16])')
-parser.add_argument('--select', type=int, default=123)
+parser.add_argument('--select', type=int, default=1234)
 
 args = parser.parse_args()
 print(args)
@@ -44,13 +44,47 @@ data_path = os.path.join(cur_path + '/data/test/data.csv')
 pt_path_withoutYaw = os.path.join(cur_path + '/results/tcn.pt')
 pt_path_withPI = os.path.join(cur_path + '/results/PItcn_withyaw.pt')
 pt_path_withoutPI = os.path.join(cur_path + '/results/tcn_withyaw.pt')
+pt_path_with_dt = os.path.join(cur_path + '/results/tcn_withyaw_dt1.pt')
 print(f'data_path:{data_path}')
 # print(f'pt_path:{pt_path}')
 ### ctrl + yaw + PI loss : 111 means has all
 saved_dict_100 = torch.load(pt_path_withoutYaw)
 saved_dict_110 = torch.load(pt_path_withoutPI)
 saved_dict_111 = torch.load(pt_path_withPI)
+saved_dict_000 = torch.load(pt_path_with_dt)
 
+class data_character():
+    def __init__(self, sequence_len, input_size, output_size):
+        super(data_character, self).__init__()
+        print(f'inputsize:{input_size}')
+        self.row_len = sequence_len
+        self.col_len = input_size
+        self.out_len = output_size
+
+def divide_params(params, data):
+    row_len = data.row_len
+    col_len = data.col_len
+    out_len = data.out_len
+    divide1 = col_len
+    divide2 = col_len + out_len
+    print(f'divide1:{divide1}')
+    print(f'divide2:{divide2}')
+    a = params[:, :col_len*row_len].reshape(row_len, col_len)
+    f_a = params[:, col_len*row_len : col_len*row_len + out_len]
+    df_a = params[:, col_len*row_len + out_len:].reshape(out_len, row_len, col_len)
+    print(f'a:{a}')
+    print(f'fa:{f_a}')
+    print(f'dfa:{df_a}')
+    return a, f_a, df_a
+
+def linear_calc(a, f_a, df_a, x):
+    delta = x - a
+    original_f_delta = df_a * delta
+    f_delta = np.sum(df_a * delta, axis=(1, 2))
+    f = f_a + f_delta
+    # print(f'original f_delta:{df_a * delta}')
+    # print(f'f_delta:{f_delta}')
+    return f
 
 
 def nominal_calc(input):
@@ -83,6 +117,32 @@ def nominal_loss_calc(vx, vy, w, real_data):
     return loss
 
 
+def calc_diff_time(t, start_dice):
+    data = t
+    if np.ndim(start_dice) == 2:
+        start_dice = start_dice.ravel()
+    if np.size(start_dice) == 0 or (np.size(start_dice) > 0 and start_dice[0] != 0):
+        start_indices_noend = np.insert(start_dice, 0, 0)
+        flag = True  
+    else: 
+        start_indices_noend = start_dice
+    start_indices = np.insert(start_indices_noend, len(start_indices_noend), data.shape[0]-1)
+    raw_dt = t#
+    dt = np.diff(t)
+    print(f't:{dt}')
+    raw_dt[:-1] = dt
+    raw_dt[-1] = 0
+    print(f'start_indices:{start_indices}')
+    for i in start_indices.squeeze():
+        # print(f'i{i}')
+        raw_dt[i] = 0
+        if i-1 >= 0:
+            raw_dt[i-1] = 0
+    return raw_dt
+
+
+
+
 def test():
     rec_file = data_path
     raw_data  = pd.read_csv(rec_file)
@@ -100,6 +160,9 @@ def test():
         raw_y_dot = np.array(raw_data['vel_y_input'])
         raw_yaw_dot = np.array(raw_data['vel_w_input']) # vel_w too small
         # print(f'raw x dot{raw_x_dot}')
+        # dt
+        raw_con_t = np.array(raw_data['con_time'])
+        raw_dt = calc_diff_time(raw_con_t, idx)
         # control 
         raw_u_v = np.array(raw_data['con_x_input'])
         raw_u_w = np.array(raw_data['con_z_input'])
@@ -111,183 +174,212 @@ def test():
         # time_sequence = np.column_stack((raw_x_dot, raw_y_dot, raw_yaw_dot, raw_u_v, raw_u_w))# with control
         time_sequence_withyaw = np.column_stack((raw_x_dot, raw_y_dot, raw_yaw_dot, raw_u_v, raw_u_w, raw_yaw))# with control and yaw
         time_sequence_noyaw = np.column_stack((raw_x_dot, raw_y_dot, raw_yaw_dot, raw_u_v, raw_u_w))
-        print(f'time sequence :{time_sequence_noyaw}')
-        data_length = 1000 # whole data length
-        sequence_length = 5 # net input length
+        time_sequence_with_dt = np.column_stack((raw_x_dot, raw_y_dot, raw_yaw_dot, raw_u_v, raw_u_w, raw_yaw, raw_dt))
+        print(f'time sequence :{time_sequence_with_dt}')
+        # data_length = 1000 # whole data length
+        # sequence_length = 5 # net input length
 
-        data_traj_100 = TrajectoryDataset(time_sequence_noyaw, sequence_length, idx, saved_dict_100['output_size'])
-        data_traj_110 = TrajectoryDataset(time_sequence_withyaw, sequence_length, idx, saved_dict_110['output_size'])
-        data_traj_111 = TrajectoryDataset(time_sequence_withyaw, sequence_length, idx, saved_dict_111['output_size'])
+        # data_traj_100 = TrajectoryDataset(time_sequence_noyaw, sequence_length, idx, saved_dict_100['output_size'])
+        # data_traj_110 = TrajectoryDataset(time_sequence_withyaw, sequence_length, idx, saved_dict_110['output_size'])
+        # data_traj_111 = TrajectoryDataset(time_sequence_withyaw, sequence_length, idx, saved_dict_111['output_size'])
+        # data_traj_000 = TrajectoryDataset(time_sequence_with_dt, sequence_length, idx, saved_dict_000['output_size'])
 
-        # print(f"data_traj :{data_traj[0]}")
+        # # print(f"data_traj :{data_traj[0]}")
 
-        data_loader_100 = DataLoader(data_traj_100, batch_size=128, shuffle=True)
-        data_loader_110 = DataLoader(data_traj_110, batch_size=128, shuffle=True)
-        data_loader_111 = DataLoader(data_traj_111, batch_size=128, shuffle=True)
+        # data_loader_100 = DataLoader(data_traj_100, batch_size=128, shuffle=True)
+        # data_loader_110 = DataLoader(data_traj_110, batch_size=128, shuffle=True)
+        # data_loader_111 = DataLoader(data_traj_111, batch_size=128, shuffle=True)
+        # data_loader_000 = DataLoader(data_traj_000, batch_size=128, shuffle=True)
 
-
-        # init training model
-        input_size=args.n_input
-        output_size=args.n_out # channels
-        hidden_size=64
-        num_layers=3
-        num_channels = [16,16,16] # args.tcn_channels
-        kernel_size = 3
-        dropout = 0.3
-        # print(saved_dict['num_channels'])
+        # # init training model
+        # input_size=args.n_input
+        # output_size=args.n_out # channels
+        # hidden_size=64
+        # num_layers=3
+        # num_channels = [16,16,16] # args.tcn_channels
+        # kernel_size = 3
+        # dropout = 0.3
+        # # print(saved_dict['num_channels'])
         
         
-        ## Model 100 read
-        model_100 = TCN_withMLP(input_size=saved_dict_100['input_size'], output_size=saved_dict_100['output_size'], 
-                            num_channels=saved_dict_100['num_channels'], kernel_size=saved_dict_100['kernel_size'], dropout=saved_dict_100['dropout'])
+        # ## Model 100 read
+        # model_100 = TCN_withMLP(input_size=saved_dict_100['input_size'], output_size=saved_dict_100['output_size'], 
+        #                     num_channels=saved_dict_100['num_channels'], kernel_size=saved_dict_100['kernel_size'], dropout=saved_dict_100['dropout'])
         
-        model_100.load_state_dict(saved_dict_100['state_dict'])
-        # Set evaluate mode
-        model_100.eval()  
-        ## model 110 read
-        model_110 = TCN_withMLP(input_size=saved_dict_110['input_size'], output_size=saved_dict_110['output_size'], 
-                            num_channels=saved_dict_110['num_channels'], kernel_size=saved_dict_110['kernel_size'], dropout=saved_dict_110['dropout'])
+        # model_100.load_state_dict(saved_dict_100['state_dict'])
+        # # Set evaluate mode
+        # model_100.eval()  
+        # ## model 110 read
+        # model_110 = TCN_withMLP(input_size=saved_dict_110['input_size'], output_size=saved_dict_110['output_size'], 
+        #                     num_channels=saved_dict_110['num_channels'], kernel_size=saved_dict_110['kernel_size'], dropout=saved_dict_110['dropout'])
         
-        model_110.load_state_dict(saved_dict_110['state_dict'])
-        # Set evaluate mode
-        model_110.eval()  
+        # model_110.load_state_dict(saved_dict_110['state_dict'])
+        # # Set evaluate mode
+        # model_110.eval()  
 
-        ## model 111 read
-        model_111 = TCN_withMLP(input_size=saved_dict_111['input_size'], output_size=saved_dict_111['output_size'], 
-                            num_channels=saved_dict_111['num_channels'], kernel_size=saved_dict_111['kernel_size'], dropout=saved_dict_111['dropout'])
+        # ## model 111 read
+        # model_111 = TCN_withMLP(input_size=saved_dict_111['input_size'], output_size=saved_dict_111['output_size'], 
+        #                     num_channels=saved_dict_111['num_channels'], kernel_size=saved_dict_111['kernel_size'], dropout=saved_dict_111['dropout'])
         
-        model_111.load_state_dict(saved_dict_111['state_dict'])
-        # Set evaluate mode
-        model_111.eval()  
+        # model_111.load_state_dict(saved_dict_111['state_dict'])
+        # # Set evaluate mode
+        # model_111.eval()  
 
-        N = 100
-
-        criterion = nn.MSELoss()
-        # getting slice
-        test_num = 10
-        start = random.randint(0, time_sequence_withyaw.shape[0]-test_num-1)
-        test_100 = []
-        test_110 = []
-        test_111 = []
-
-        losses_100 = []
-        losses_110 = []
-        losses_111 = []
-
-        # print(f"actual_data:{actual_data}")
-
-        real_data = []
-        for i in range(test_num):
-            print(f'start:{start}')
-            test_input_100,real_out = data_traj_100[i + start]
-            test_input_110,_ = data_traj_110[i + start]
-            test_input_111,_ = data_traj_111[i + start]
-            real_data.append(real_out)
-            test_100.append(test_input_100)
-            test_110.append(test_input_110)
-            test_111.append(test_input_111)
-        test_100 = torch.tensor(np.array(test_100))
-        test_110 = torch.tensor(np.array(test_110))
-        test_111 = torch.tensor(np.array(test_111))
-        real_data = np.array(real_data).squeeze()
-        print(f"test input:{test_100[0]}")
-        print(f"real_data[start]:{real_data[0]}")
+        # ## model 000 read
+        # model_000 = TCN_withMLP(input_size=saved_dict_000['input_size'], output_size=saved_dict_000['output_size'], 
+        #                     num_channels=saved_dict_000['num_channels'], kernel_size=saved_dict_000['kernel_size'], dropout=saved_dict_000['dropout'])
         
-        with torch.no_grad():
-            # 假设你有一个输入序列 input_sequence_tensor
-            predicted_sequence_100 = model_100(test_100).squeeze()
-            predicted_sequence_110 = model_110(test_110).squeeze()
-            predicted_sequence_111 = model_111(test_111).squeeze()
-            vx,vy,w = nominal_calc(test_111)
-            nominal_loss = nominal_loss_calc(vx, vy, w, real_data)
+        # model_000.load_state_dict(saved_dict_000['state_dict'])
+        # # Set evaluate mode
+        # model_000.eval()  
 
-        # Record Losses
-        for i, item in enumerate(predicted_sequence_100):
-            loss = criterion(item, torch.tensor(real_data[i, :args.n_out]))
-            losses_100.append(torch.sqrt(loss))
-        for i, item in enumerate(predicted_sequence_110):
-            loss = criterion(item, torch.tensor(real_data[i, :args.n_out]))
-            losses_110.append(torch.sqrt(loss))
-        for i, item in enumerate(predicted_sequence_111):
-            loss = criterion(item, torch.tensor(real_data[i, :args.n_out]))
-            losses_111.append(torch.sqrt(loss))
-        # Show average loss for each model
-        losses_100_mean = np.mean(losses_100)
-        losses_110_mean = np.mean(losses_110)
-        losses_111_mean = np.mean(losses_111)
-        nominal_mean = np.mean(nominal_loss)
-        print(f'mean loss for model ctrl:{losses_100_mean}')
-        print(f'mean loss for model c+yaw:{losses_110_mean}')
-        print(f'mean loss for model c+yaw+PI:{losses_111_mean}')
-        print(f'mean loss for model Nominal:{nominal_mean}')
+        # N = 100
 
+        # criterion = nn.MSELoss()
+        # # getting slice
+        # test_num = 50
+        # start = random.randint(0, time_sequence_withyaw.shape[0]-test_num-1)
+        # test_100 = []
+        # test_110 = []
+        # test_111 = []
+        # test_000 = []
 
-        # 绘制实际数据和预测数据
-        predicted_sequence_100 = predicted_sequence_100.numpy()  # 预测数据
-        predicted_sequence_110 = predicted_sequence_110.numpy()  # 预测数据
-        predicted_sequence_111 = predicted_sequence_111.numpy()  # 预测数据
-        print(f'size of actual data:{real_data.shape[0]}')
-        print(f'size of predict data:{predicted_sequence_100.shape[0]}')
+        # losses_100 = []
+        # losses_110 = []
+        # losses_111 = []
+        # losses_000 = []
+
+        # # print(f"actual_data:{actual_data}")
+
+        # real_data = []
+        # for i in range(test_num):
+        #     print(f'start:{start}')
+        #     test_input_100,real_out = data_traj_100[i + start]
+        #     test_input_110,_ = data_traj_110[i + start]
+        #     test_input_111,_ = data_traj_111[i + start]
+        #     test_input_000,_ = data_traj_000[i + start]
+        #     real_data.append(real_out)
+        #     test_100.append(test_input_100)
+        #     test_110.append(test_input_110)
+        #     test_111.append(test_input_111)
+        #     test_000.append(test_input_000)
+        # test_100 = torch.tensor(np.array(test_100))
+        # test_110 = torch.tensor(np.array(test_110))
+        # test_111 = torch.tensor(np.array(test_111))
+        # test_000 = torch.tensor(np.array(test_000))
+        # real_data = np.array(real_data).squeeze()
+        # print(f"test input:{test_100[0]}")
+        # print(f"real_data[start]:{real_data[0]}")
         
-        # 绘制损失曲线
-        plt.figure(figsize=(12, 6))
-        plt.subplot(2, 2, 1)  # 第一个子图用于损失曲线
-        plt.plot(losses_100, label="ctrl loss", marker='o', color='green')
-        plt.plot(losses_110,label="c+yaw  loss", marker='x', color='orange')
-        plt.plot(losses_111,label="c+yaw+PI loss", marker='*', color='purple')
-        plt.plot(nominal_loss,label="Nominal loss", marker='^', color='red')
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.title("testing Loss")
-        plt.legend()
-        # 第二个子图用于实际和预测数据
-        plt.subplot(2, 2, 2)  
-        plt.plot(real_data[:, 0], label="Actual x", marker='o', color='blue')
-        if '1' in str(selection):
-            plt.plot(predicted_sequence_100[:, 0], linestyle='--', label="ctrl Predicted x", marker='x',color='green')
-        if '2' in str(selection):
-            plt.plot(predicted_sequence_110[:, 0], linestyle='--', label="c+yaw Predicted x", marker='x',color='orange')
-        if '3' in str(selection):
-            plt.plot(predicted_sequence_111[:, 0], linestyle='--', label="c+yaw+PI Predicted x", marker='x',color='purple')
-        plt.plot(vx.numpy(), linestyle='--', label="Nominal x", marker='*',color='red')
-        plt.xlabel("Time Step")
-        plt.ylabel("Value")
-        plt.title("Actual vs. Predicted Data (x)")
-        plt.legend()
+        # with torch.no_grad():
+        #     # 假设你有一个输入序列 input_sequence_tensor
+        #     predicted_sequence_100 = model_100(test_100).squeeze()
+        #     predicted_sequence_110 = model_110(test_110).squeeze()
+        #     predicted_sequence_111 = model_111(test_111).squeeze()
+        #     predicted_sequence_000 = model_000(test_000).squeeze()
+        #     vx,vy,w = nominal_calc(test_111)
+        #     nominal_loss = nominal_loss_calc(vx, vy, w, real_data)
 
-        plt.subplot(2, 2, 3) 
-        plt.plot(real_data[:, 1], label="Actual y", marker='o',color='blue')
-        if '1' in str(selection):
-            plt.plot(predicted_sequence_100[:, 1], linestyle='--', label="ctrl Predicted y", marker='x',color='green')
-        if '2' in str(selection):
-            plt.plot(predicted_sequence_110[:, 1], linestyle='--', label="c+yaw Predicted y", marker='x',color='orange')
-        if '3' in str(selection):
-            plt.plot(predicted_sequence_111[:, 1], linestyle='--', label="c+yaw+PI Predicted y", marker='x',color='purple')
-        plt.plot(vy.numpy(), linestyle='--', label="Nominal y", marker='*',color='red')
-        plt.xlabel("Time Step")
-        plt.ylabel("Value")
-        plt.title("Actual vs. Predicted Data (y)")
-        plt.legend()
+        # # Record Losses
+        # for i, item in enumerate(predicted_sequence_100):
+        #     loss = criterion(item, torch.tensor(real_data[i, :args.n_out]))
+        #     losses_100.append(torch.sqrt(loss))
+        # for i, item in enumerate(predicted_sequence_110):
+        #     loss = criterion(item, torch.tensor(real_data[i, :args.n_out]))
+        #     losses_110.append(torch.sqrt(loss))
+        # for i, item in enumerate(predicted_sequence_111):
+        #     loss = criterion(item, torch.tensor(real_data[i, :args.n_out]))
+        #     losses_111.append(torch.sqrt(loss))
+        # for i, item in enumerate(predicted_sequence_000):
+        #     loss = criterion(item, torch.tensor(real_data[i, :args.n_out]))
+        #     losses_000.append(torch.sqrt(loss))
+        # # Show average loss for each model
+        # losses_100_mean = np.mean(losses_100)
+        # losses_110_mean = np.mean(losses_110)
+        # losses_111_mean = np.mean(losses_111)
+        # losses_000_mean = np.mean(losses_000)
+        # nominal_mean = np.mean(nominal_loss)
+        # print(f'mean loss for model ctrl:{losses_100_mean}')
+        # print(f'mean loss for model c+yaw:{losses_110_mean}')
+        # print(f'mean loss for model c+yaw+PI:{losses_111_mean}')
+        # print(f'mean loss for model c+yaw+PI+time:{losses_000_mean}')
+        # print(f'mean loss for model Nominal:{nominal_mean}')
 
 
-        plt.subplot(2, 2, 4) 
-        plt.plot(real_data[:, 2], label="Actual z", marker='o', color='blue')
-        if '1' in str(selection):
-            plt.plot(predicted_sequence_100[:, 2], linestyle='--', label="ctrl Predicted z", marker='x', color='green')
-        if '2' in str(selection):
-            plt.plot(predicted_sequence_110[:, 2], linestyle='--', label="c+yaw Predicted z", marker='x', color='orange')
-        if '3' in str(selection):
-            plt.plot(predicted_sequence_111[:, 2], linestyle='--', label="c+yaw+PI Predicted z", marker='x', color='purple')
-        plt.plot(w.numpy(), linestyle='--', label="Nominal w", marker='*', color='red')
-        plt.xlabel("Time Step")
-        plt.ylabel("Value")
-        plt.title("Actual vs. Predicted Data (z)")
-        plt.legend()
+        # # 绘制实际数据和预测数据
+        # predicted_sequence_100 = predicted_sequence_100.numpy()  # 预测数据
+        # predicted_sequence_110 = predicted_sequence_110.numpy()  # 预测数据
+        # predicted_sequence_111 = predicted_sequence_111.numpy()  # 预测数据
+        # predicted_sequence_000 = predicted_sequence_000.numpy()
+        # print(f'size of actual data:{real_data.shape[0]}')
+        # print(f'size of predict data:{predicted_sequence_100.shape[0]}')
+        
+        # # 绘制损失曲线
+        # plt.figure(figsize=(12, 6))
+        # plt.subplot(2, 2, 1)  # 第一个子图用于损失曲线
+        # plt.plot(losses_100, label="ctrl loss", marker='o', color='green')
+        # plt.plot(losses_110,label="c+yaw  loss", marker='x', color='orange')
+        # plt.plot(losses_111,label="c+yaw+PI loss", marker='*', color='purple')
+        # plt.plot(losses_000,label="c+yaw+PI+time loss", marker='*', color='black')
+        # plt.plot(nominal_loss,label="Nominal loss", marker='^', color='red')
+        # plt.xlabel("Epoch")
+        # plt.ylabel("Loss")
+        # plt.title("testing Loss")
+        # plt.legend()
+        # # 第二个子图用于实际和预测数据
+        # plt.subplot(2, 2, 2)  
+        # plt.plot(real_data[:, 0], label="Actual x", marker='o', color='blue')
+        # if '1' in str(selection):
+        #     plt.plot(predicted_sequence_100[:, 0], linestyle='--', label="ctrl Predicted x", marker='x',color='green')
+        # if '2' in str(selection):
+        #     plt.plot(predicted_sequence_110[:, 0], linestyle='--', label="c+yaw Predicted x", marker='x',color='orange')
+        # if '3' in str(selection):
+        #     plt.plot(predicted_sequence_111[:, 0], linestyle='--', label="c+yaw+PI Predicted x", marker='x',color='purple')
+        # if '4' in str(selection):
+        #     plt.plot(predicted_sequence_000[:, 1], linestyle='--', label="c+yaw+PI+time Predicted x", marker='x',color='black')
+        # plt.plot(vx.numpy(), linestyle='--', label="Nominal x", marker='*',color='red')
+        # plt.xlabel("Time Step")
+        # plt.ylabel("Value")
+        # plt.title("Actual vs. Predicted Data (x)")
+        # plt.legend()
+
+        # plt.subplot(2, 2, 3) 
+        # plt.plot(real_data[:, 1], label="Actual y", marker='o',color='blue')
+        # if '1' in str(selection):
+        #     plt.plot(predicted_sequence_100[:, 1], linestyle='--', label="ctrl Predicted y", marker='x',color='green')
+        # if '2' in str(selection):
+        #     plt.plot(predicted_sequence_110[:, 1], linestyle='--', label="c+yaw Predicted y", marker='x',color='orange')
+        # if '3' in str(selection):
+        #     plt.plot(predicted_sequence_111[:, 1], linestyle='--', label="c+yaw+PI Predicted y", marker='x',color='purple')
+        # if '4' in str(selection):
+        #     plt.plot(predicted_sequence_000[:, 1], linestyle='--', label="c+yaw+PI+time Predicted y", marker='x',color='black')
+        # plt.plot(vy.numpy(), linestyle='--', label="Nominal y", marker='*',color='red')
+        # plt.xlabel("Time Step")
+        # plt.ylabel("Value")
+        # plt.title("Actual vs. Predicted Data (y)")
+        # plt.legend()
 
 
-        plt.suptitle(f"start:{start}, end:{start+test_num}")
-        plt.tight_layout()  # 调整子图布局，使其更清晰
-        plt.show()
+        # plt.subplot(2, 2, 4) 
+        # plt.plot(real_data[:, 2], label="Actual z", marker='o', color='blue')
+        # if '1' in str(selection):
+        #     plt.plot(predicted_sequence_100[:, 2], linestyle='--', label="ctrl Predicted z", marker='x', color='green')
+        # if '2' in str(selection):
+        #     plt.plot(predicted_sequence_110[:, 2], linestyle='--', label="c+yaw Predicted z", marker='x', color='orange')
+        # if '3' in str(selection):
+        #     plt.plot(predicted_sequence_111[:, 2], linestyle='--', label="c+yaw+PI Predicted z", marker='x', color='purple')
+        # if '4' in str(selection):
+        #     plt.plot(predicted_sequence_000[:, 2], linestyle='--', label="c+yaw+PI+time Predicted z", marker='x',color='black')
+        # plt.plot(w.numpy(), linestyle='--', label="Nominal w", marker='*', color='red')
+        # plt.xlabel("Time Step")
+        # plt.ylabel("Value")
+        # plt.title("Actual vs. Predicted Data (z)")
+        # plt.legend()
+
+
+        # plt.suptitle(f"start:{start}, end:{start+test_num}")
+        # plt.tight_layout()  # 调整子图布局，使其更清晰
+        # plt.show()
 
 
 

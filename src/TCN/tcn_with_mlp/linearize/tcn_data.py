@@ -43,6 +43,7 @@ class TrajectoryDataset(Dataset):
         if index == self.start_indices[0]:
             # print(f'first index')
             first_index = 0
+            index = index + 1
         elif index == self.start_indices[-1]:
             # print(f'last index')
             first_index = len(self.start_indices) - 2
