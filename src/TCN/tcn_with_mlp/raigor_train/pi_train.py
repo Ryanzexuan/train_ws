@@ -37,7 +37,7 @@ print(lambda_v)
 
 cur_path = os.getcwd()
 print(f'cur_path:{cur_path}')
-data_path = os.path.join(cur_path + '/../bag/big_flat.csv')
+data_path = os.path.join(cur_path + '/data/data2.csv') # 3490
 print(f'data_path:{data_path}')
 ## To be done
 def physics_loss(out, input):
@@ -150,14 +150,20 @@ def train():
     if True: 
         plt.plot(loss_infos)
         plt.show()
-
+    hidden_size = [64, 32, 32]
+    hidden_layers = 3
+    # input_size, hidden_size, output_size, n_hidden, activation=None
     save_dict = {
                 'state_dict': model.state_dict(),
                 'input_size': input_size,
                 'num_channels': num_channels,
                 'output_size': output_size,
                 'kernel_size': kernel_size,
-                'dropout': dropout
+                'dropout': dropout,
+                'hidden_size': hidden_size,
+                'mlp_inputsize': num_channels[-1],
+                'mlp_outputsize': output_size,
+                'hidden_layers': hidden_layers
             }
     save_file_path = os.path.join(cur_path + '/../results/raigor_pi.pt')
 

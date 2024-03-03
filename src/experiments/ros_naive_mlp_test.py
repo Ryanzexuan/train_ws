@@ -499,6 +499,19 @@ def Callback_base(msg):
     cur_rec_state_set[5] = msg.twist.twist.linear.y 
     cur_rec_state_set[6] = msg.twist.twist.angular.z
 
+def Callback_base_turtle(msg):
+    # rospy.loginfo("msg got~!!!!!")
+    # quaternion = msg.pose.pose.orientation
+    # rospy.loginfo(f"x pose{msg.pose.pose.position.x}")
+    cur_rec_state_set[0] = msg.x 
+    cur_rec_state_set[1] = msg.y 
+    cur_rec_state_set[2] = msg.theta
+    cur_rec_state_set[3] = rospy.Time.now().to_sec()
+    cur_rec_state_set[4] = msg.linear_velocity * np.cos(msg.theta)
+    cur_rec_state_set[5] = msg.linear_velocity * np.sin(msg.theta)
+    cur_rec_state_set[6] = msg.angular_velocity
+    # rospy.loginfo(f'cur state:{cur_rec_state_set}')
+
 def save_data2csv(next, u, pst, ref):
     # print(f"next:{next}")
     # print(f"u:{u}")
@@ -521,7 +534,9 @@ def save_data2csv(next, u, pst, ref):
 
 if __name__ == '__main__':
     rospy.init_node("acados", anonymous=True)
-    rospy.Subscriber("/base_pose_ground_truth", Odometry, Callback_base)
-    nn_msg = rospy.Publisher('/cmd_vel', Twist, queue_size=10)  
+    # rospy.Subscriber("/base_pose_ground_truth", Odometry, Callback_base)
+    # nn_msg = rospy.Publisher('/cmd_vel', Twist, queue_size=10)  
+    rospy.Subscriber("/turtle1/pose", Pose, Callback_base_turtle) 
+    nn_msg = rospy.Publisher('/turtle1/cmd_vel', Twist, queue_size=10) 
     rate = rospy.Rate(1)   
     run()

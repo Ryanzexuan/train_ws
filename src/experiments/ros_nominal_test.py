@@ -24,6 +24,7 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32MultiArray
 from gazebo_msgs.srv import SetModelState
 from gazebo_msgs.msg import ModelState
+from turtlesim.msg import Pose  # 导入 Pose 消息类型
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -340,7 +341,8 @@ def run():
     goal = False
     control = Twist()
     # print(x_ref)
-    while(goal is False):
+    rate = rospy.Rate(10)   
+    while(goal is False and not rospy.is_shutdown()):
         # solve ocp
         now = time.time()
         
@@ -403,7 +405,7 @@ def run():
         for i in range(N):
             x_l.append(solver.get(i, "x"))
  
-        
+        print(f'cost:{solver.get_cost()}')
         
         elapsed = time.time() - now
         opt_times.append(elapsed)
@@ -412,8 +414,9 @@ def run():
         if i == 12000:
             break
         print(f"Nsim:{Nsim}")
+        rate.sleep()
 
-
+    
     print(solver.get_stats('residuals'))
     print(simX_vel)
     simX = np.array(simX)
@@ -514,10 +517,25 @@ def Callback_base(msg):
     cur_rec_state_set[5] = msg.twist.twist.linear.y 
     cur_rec_state_set[6] = msg.twist.twist.angular.z
 
+def Callback_base_turtle(msg):
+    # rospy.loginfo("msg got~!!!!!")
+    # quaternion = msg.pose.pose.orientation
+    # rospy.loginfo(f"x pose{msg.pose.pose.position.x}")
+    cur_rec_state_set[0] = msg.x 
+    cur_rec_state_set[1] = msg.y 
+    cur_rec_state_set[2] = msg.theta
+    cur_rec_state_set[3] = rospy.Time.now().to_sec()
+    cur_rec_state_set[4] = msg.linear_velocity * np.cos(msg.theta)
+    cur_rec_state_set[5] = msg.linear_velocity * np.sin(msg.theta)
+    cur_rec_state_set[6] = msg.angular_velocity
+    # rospy.loginfo(f'cur state:{cur_rec_state_set}')
 
 if __name__ == '__main__':
     rospy.init_node("acados", anonymous=True)
-    rospy.Subscriber("/base_pose_ground_truth", Odometry, Callback_base)
-    nn_msg = rospy.Publisher('/cmd_vel', Twist, queue_size=10)  
-    rate = rospy.Rate(1)   
+    # rospy.Subscriber("/base_pose_ground_truth", Odometry, Callback_base)
+    # nn_msg = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+
+    rospy.Subscriber("/turtle1/pose", Pose, Callback_base_turtle) 
+    nn_msg = rospy.Publisher('/turtle1/cmd_vel', Twist, queue_size=10)    
+    
     run()

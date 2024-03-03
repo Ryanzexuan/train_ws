@@ -5,7 +5,7 @@ from model import TCN_withMLP
 from tcn_common_for_multi import TemporalConvNet
 from tqdm import tqdm
 import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import DataLoader
 import torch.optim as optim
@@ -56,7 +56,7 @@ def physics_loss(out, input):
     
     nominal_critic = nn.MSELoss()
     loss = nominal_critic(out, nominal)
-    print(f'loss:{loss}')
+    # print(f'loss:{loss}')
     return loss
 
 def train():
@@ -82,7 +82,7 @@ def train():
     # time_sequence = np.column_stack((raw_x, raw_y, raw_yaw, raw_v, raw_w))
     idx_data = raw_data['vel_x_input'][:3000]
     idx = np.array(np.where(idx_data == 0))
-    print(f"idx:{idx}")
+    # print(f"idx:{idx}")
     time_sequence = np.column_stack((raw_x_dot, raw_y_dot, raw_yaw_dot, raw_u_v, raw_u_w, raw_yaw)) # with control
     # time_sequence = np.column_stack((raw_x_dot, raw_y_dot, raw_yaw_dot))[:3000] # with no control
 
@@ -147,9 +147,9 @@ def train():
         bar.set_description(f'Train Loss: {train_loss_mean:.6f}')
         bar.refresh()
 
-    if True: 
-        plt.plot(loss_infos)
-        plt.show()
+    # if True: 
+    #     plt.plot(loss_infos)
+    #     plt.show()
 
     save_dict = {
                 'state_dict': model.state_dict(),
@@ -159,7 +159,7 @@ def train():
                 'kernel_size': kernel_size,
                 'dropout': dropout
             }
-    save_file_path = os.path.join(cur_path + '/results/PItcn_withyaw.pt')
+    save_file_path = os.path.join(cur_path + '/results/sim/PItcn_withyaw.pt')
 
     torch.save(save_dict, save_file_path)
 

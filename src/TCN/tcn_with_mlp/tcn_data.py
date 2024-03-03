@@ -5,8 +5,7 @@ import pandas as pd
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import numpy as np
-import matplotlib.pyplot as plt
-import ml_casadi.torch as mc
+# import matplotlib.pyplot as plt
 
 
 class TrajectoryDataset(Dataset):
@@ -52,9 +51,9 @@ class TrajectoryDataset(Dataset):
             min_search_positive = np.min(search[search > 0])
             first_index = np.where(search == min_search_positive)[0][0]
         # first_index = np.argmin((index - self.start_indices) > 0) - 1
-        print(f"index:{index}")
-        print(f'first index:{first_index}')
-        print(f'{self.start_indices}')
+        # print(f"index:{index}")
+        # print(f'first index:{first_index}')
+        # print(f'{self.start_indices}')
         if first_index + 2 == self.start_indices.shape[0]:
             # print(f'final traj')
             remain_num = self.data.shape[0] - index

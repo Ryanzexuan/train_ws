@@ -40,7 +40,7 @@ selection = args.select
 cur_path = os.getcwd()
 print(f'cur_path:{cur_path}')
 # uneven_manual, data, dataset_gzsim_nominal, tele_random, uneven, uneven.mpc 
-data_path = os.path.join(cur_path + '/../bag/short_terrain.csv')
+data_path = os.path.join(cur_path + '/../bag/test.csv') # 5198
 pt_path_withoutYaw = os.path.join(cur_path + '/../results/tcn.pt')
 pt_path_withPI = os.path.join(cur_path + '/../results/raigor_pi.pt')
 pt_path_withoutPI = os.path.join(cur_path + '/../results/tcn_withyaw.pt')
@@ -258,6 +258,7 @@ def test():
             print(f'start:{start}')
             test_input_100,real_out = data_traj_111[i + start]
             test_input_111,_ = data_traj_111[i + start]
+            print(f'test_input_111:{test_input_111.shape}')
             real_data.append(real_out)
             test_111.append(test_input_111)
         test_111 = torch.tensor(np.array(test_111))

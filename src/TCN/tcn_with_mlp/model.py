@@ -1,13 +1,13 @@
 from torch import nn
 from tcn_common_for_multi import TemporalConvNet, MLP
 import torch.nn.functional as F
-import ml_casadi.torch as mc
+# import ml_casadi.torch as mc
 
 
-class NormalizedTCN(mc.TorchMLCasadiModule):
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
+# class NormalizedTCN(mc.TorchMLCasadiModule):
+#     def __init__(self, model):
+#         super().__init__()
+#         self.model = model
         
 
 

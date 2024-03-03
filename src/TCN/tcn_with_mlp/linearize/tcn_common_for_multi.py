@@ -41,6 +41,7 @@ class TemporalBlock(nn.Module):
     
     def forward(self, x):
         out = self.net(x)
+        # print(f'torch.tcn:{out.shape}')
         res = x if self.downsample is None else self.downsample(x)
         return self.relu(out + res)
 

@@ -19,7 +19,7 @@ class TCN_withMLP(nn.Module):
 
 
     def forward(self, x):
-        # TCN input shape is (batchsize, channel, length)
+        # TCN input shape is (batchsize, length, channel)
         # linear input shape must be (batchsize, length, channel)
         output = self.tcn(x.transpose(1, 2)).transpose(1, 2) # output is (batchsize, length, channel) length for each batch supposed to be 1
         # print(f'tcn out:{output.shape}')

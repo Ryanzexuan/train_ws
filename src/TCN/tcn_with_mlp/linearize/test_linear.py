@@ -41,17 +41,15 @@ cur_path = os.getcwd()
 print(f'cur_path:{cur_path}')
 # uneven_manual, data, dataset_gzsim_nominal, tele_random, uneven, uneven.mpc 
 data_path = os.path.join(cur_path + '/data/test/data.csv')
-pt_path_withoutYaw = os.path.join(cur_path + '/results/tcn.pt')
-pt_path_withPI = os.path.join(cur_path + '/results/PItcn_withyaw.pt')
-pt_path_withoutPI = os.path.join(cur_path + '/results/tcn_withyaw.pt')
+pt_path_withPI = os.path.join(cur_path + '/../results/raigor_pi.pt')
 print(f'data_path:{data_path}')
 # print(f'pt_path:{pt_path}')
 ### ctrl + yaw + PI loss : 111 means has all
 # saved_dict_100 = torch.load(pt_path_withoutYaw) # input 5
 # saved_dict_110 = torch.load(pt_path_withoutPI)
-saved_dict_111 = torch.load(pt_path_withPI)
+saved_dict = torch.load(pt_path_withPI)
 
-save_dict = saved_dict_111
+
 
 class data_character():
     def __init__(self, sequence_len, input_size, output_size, predict_horizon=2):
@@ -156,7 +154,7 @@ def test():
         data_length = 1000 # whole data length
         sequence_length = 5 # net input length
 
-        data_traj_100 = TrajectoryDataset(time_sequence_noyaw, sequence_length, idx, save_dict['output_size'])
+        data_traj_100 = TrajectoryDataset(time_sequence_noyaw, sequence_length, idx, saved_dict['output_size'])
         data_loader_100 = DataLoader(data_traj_100, batch_size=128, shuffle=True)
 
 
@@ -173,9 +171,9 @@ def test():
         data_info = None
         data_info = data_character(sequence_length, input_size, output_size)
         ## Model 100 read
-        model_100 = TCN_withMLP(input_size=save_dict['input_size'], output_size=save_dict['output_size'], 
-                            num_channels=save_dict['num_channels'], kernel_size=save_dict['kernel_size'], dropout=save_dict['dropout'])
-        model_100.load_state_dict(save_dict['state_dict'])
+        model_100 = TCN_withMLP(input_size=saved_dict['input_size'], output_size=saved_dict['output_size'], 
+                            num_channels=saved_dict['num_channels'], kernel_size=saved_dict['kernel_size'], dropout=saved_dict['dropout'])
+        model_100.load_state_dict(saved_dict['state_dict'])
         # Set evaluate mode
         # model_100.eval()  
         model = NormalizedTCN(model_100)

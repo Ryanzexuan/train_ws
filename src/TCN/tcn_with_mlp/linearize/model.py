@@ -2,7 +2,9 @@ from torch import nn
 from tcn_common_for_multi import TemporalConvNet, MLP
 import torch.nn.functional as F
 import ml_casadi.torch as mc
-
+import casadi as cs
+import torch
+from ml_casadi.torch.modules import TorchMLCasadiModule
 
 class NormalizedTCN(mc.TorchMLCasadiModule):
     def __init__(self, model):
@@ -26,6 +28,7 @@ class TCN_withMLP(nn.Module):
 
 
     def forward(self, x):
+        # x is (batchsize, length, channel)
         # TCN input shape is (batchsize, channel, length)
         # linear input shape must be (batchsize, length, channel)
         output = self.tcn(x.transpose(1, 2)).transpose(1, 2) # output is (batchsize, length, channel) length for each batch supposed to be 1
@@ -34,6 +37,22 @@ class TCN_withMLP(nn.Module):
         # print(f'after mlp shape:{output.shape}')
         return output[:, -1, :].unsqueeze(1)
 
+class TCN_withMLP_casadi(TorchMLCasadiModule):
+    def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
+        super(TCN_withMLP_casadi, self).__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+        self.tcn = TemporalConvNet(input_size, num_channels, kernel_size, dropout=dropout)
+        self.linear = MLP(num_channels[-1], output_size)
+
+
+    def forward(self, x):
+        # output = self.tcn(x)# output is (batchsize, length, channel) length for each batch supposed to be 1
+        # output = cs.transpose(output)
+        output = self.tcn(x.transpose(1, 2)).transpose(1, 2) 
+        output = self.linear(output) # output is (batchsize, channel, length)
+        # print(f'after mlp shape:{output.shape}')
+        return output[-1, :].unsqueeze(1)
 
 class TCN(nn.Module):
     def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
