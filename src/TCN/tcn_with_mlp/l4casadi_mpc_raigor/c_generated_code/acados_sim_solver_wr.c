@@ -74,7 +74,7 @@ int wr_acados_sim_create(wr_sim_solver_capsule * capsule)
     bool tmp_bool;
 
     
-    double Tsim = 0.1;
+    double Tsim = 0.2;
 
     
 

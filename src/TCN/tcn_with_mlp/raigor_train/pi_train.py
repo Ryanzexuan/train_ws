@@ -37,7 +37,7 @@ print(lambda_v)
 
 cur_path = os.getcwd()
 print(f'cur_path:{cur_path}')
-data_path = os.path.join(cur_path + '/data/data2.csv') # 3490
+data_path = os.path.join(cur_path + '/bag/train.csv') # 3490
 print(f'data_path:{data_path}')
 ## To be done
 def physics_loss(out, input):

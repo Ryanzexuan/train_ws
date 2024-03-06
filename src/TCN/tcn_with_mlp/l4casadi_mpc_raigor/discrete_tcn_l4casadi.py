@@ -343,12 +343,15 @@ class MPC:
         # Initial state (will be overwritten)
         ocp.constraints.x0 = model.x_start
 
+        v_abs = 2
+        omega_abs = 2
+        
         # Set constraints
         constraint = cs.types.SimpleNamespace()
-        constraint.v_max = 1
-        constraint.v_min = -1
-        constraint.omega_max = 0.5
-        constraint.omega_min = -0.5
+        constraint.v_max = v_abs
+        constraint.v_min = -v_abs
+        constraint.omega_max = omega_abs
+        constraint.omega_min = -omega_abs
         constraint.x_min = -2.
         constraint.x_max = 50.
         constraint.y_min = -2.
@@ -390,7 +393,7 @@ def permute_timeseries(x):
 
 
 def run():
-    N = 10  # YZX notes:true predict horizon 
+    N = 5  # YZX notes:true predict horizon 
     Nsim = 100
     # Get git commit hash for saving the model
     ws_path = os.getcwd()
@@ -494,6 +497,7 @@ def run():
     while(goal is False and not rospy.is_shutdown()):
         print(f'start solving ocp!!!!!')
         print(f"Nsim:{Nsim}")
+        x_current_withtime_all = []
         # solve ocp
         now = time.time()
         # find near ref path
@@ -512,10 +516,6 @@ def run():
         simX_b4.append(x_current)
         y_cur_ref = np.array(y_cur_ref)
         # print(f'yref N horizon:{y_cur_ref}')
-        print(f'yref nearest pose:{yref_onlypose[index]}')
-        print(f'cur robot pose:{x_current}')
-        print(f'x_cur predicted last time:{permute_timeseries(x_current_withtime)}')
-        print(f'x_cur predicted last time without permute:{x_current_withtime}')
         
         # new_col = np.zeros((y_cur_ref.shape[0], 3))
         # y_cur_ref = np.hstack((y_cur_ref, new_col))
@@ -535,20 +535,23 @@ def run():
         solver.set(0, 'lbx', x_current_withtime)
         solver.set(0, 'ubx', x_current_withtime)
         status = solver.solve()
-        # if status != 0 :
-        #     continue
-        #     raise Exception('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
+        if status != 0 :
+            #continue
+            raise Exception('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
         # print data
         cur_u = np.array(solver.get(0, 'u'))
         
         
+        
         print(f'Get u from solverS:{cur_u}')
-        print(f'residuals:{solver.get_residuals()}')
+        stationary_res,equ_res,ineq_res,complemtrary_res = solver.get_residuals()
+        print("stationary_res\tequ_res\t\tineq_res\tcomplemtrary_res")
+        # print(f'{"{:.3e}".format(stationary_res)}')
+        print(f'{"{:.3e}".format(stationary_res)}\t{"{:.3e}".format(equ_res)}\t{"{:.3e}".format(ineq_res)}\t{"{:.3e}".format(complemtrary_res)}')
         print(f'cost:{solver.get_cost()}')
+        
         solver.print_statistics()
         
-        
-
         
         control.linear.x = cur_u[0]
         control.angular.z = cur_u[1]
@@ -557,14 +560,24 @@ def run():
         solver_u = solver.get(0, 'u')
         simU.append(solver_u)
         
-        
         x_current = np.array([cur_rec_state_set[0], cur_rec_state_set[1], cur_rec_state_set[2],
                           cur_rec_state_set[4], cur_rec_state_set[5], cur_rec_state_set[6]])   
         # x_current_withtime = np.hstack([np.zeros(4), cur_rec_state_set[0], np.zeros(4), cur_rec_state_set[1], np.zeros(4), cur_rec_state_set[2],
                         #   np.zeros(4), cur_rec_state_set[4], np.zeros(4), cur_rec_state_set[5], np.zeros(4), cur_rec_state_set[6], np.zeros(10)]) # pose,vel(x,y,theta)
         
         x_current_withtime = solver.get(1,'x')
+        x_current_withtime_all_N = solver.get(N,'x')
+        for i in range(N):
+            x_current_withtime_all.append(np.array(solver.get(i+1,'x')))
 
+        print(f'yref nearest pose:{yref_onlypose[index]}')
+        print(f'cur robot pose:{x_current}')
+        print(f'x_cur predicted last time:{permute_timeseries(x_current_withtime)}')
+        for index,item in enumerate(x_current_withtime_all):
+            print(f'The {index+1}th time [pose,vel]:\n{permute_timeseries(item)}')
+
+        # print(f'x_cur predicted last time without permute:{x_current_withtime}')
+        
         # ## using integrator 
         # integrator.set('x', x_current_withtime)
         # integrator.set('u', solver_u)

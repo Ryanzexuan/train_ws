@@ -60,7 +60,7 @@
 #define WR_NY0    42
 #define WR_NY     42
 #define WR_NYN    40
-#define WR_N      10
+#define WR_N      5
 #define WR_NH     0
 #define WR_NPHI   0
 #define WR_NHN    0

@@ -352,7 +352,7 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     if (new_time_steps) {
         wr_acados_update_time_steps(capsule, N, new_time_steps);
     } else {// all time_steps are identical
-        double time_step = 0.1;
+        double time_step = 0.2;
         for (int i = 0; i < N; i++)
         {
             ocp_nlp_in_set(nlp_config, nlp_dims, nlp_in, i, "Ts", &time_step);
@@ -573,10 +573,10 @@ void wr_acados_create_5_set_nlp_in(wr_solver_capsule* capsule, const int N, doub
     double* lbu = lubu;
     double* ubu = lubu + NBU;
     
-    lbu[0] = -1;
-    ubu[0] = 1;
-    lbu[1] = -0.5;
-    ubu[1] = 0.5;
+    lbu[0] = -2;
+    ubu[0] = 2;
+    lbu[1] = -2;
+    ubu[1] = 2;
 
     for (int i = 0; i < N; i++)
     {

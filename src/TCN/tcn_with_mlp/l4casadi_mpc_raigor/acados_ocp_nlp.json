@@ -112,8 +112,8 @@
         "idxsphi": [],
         "idxsphi_e": [],
         "lbu": [
-            -1.0,
-            -0.5
+            -2,
+            -2
         ],
         "lbx": [
             -2.0,
@@ -258,8 +258,8 @@
         "lsphi": [],
         "lsphi_e": [],
         "ubu": [
-            1.0,
-            0.5
+            2,
+            2
         ],
         "ubx": [
             50.0,
@@ -11493,7 +11493,7 @@
         "/home/ryan/anaconda3/envs/py39/include/python3.9"
     ],
     "dims": {
-        "N": 10,
+        "N": 5,
         "nbu": 2,
         "nbx": 2,
         "nbx_0": 40,
@@ -11703,7 +11703,7 @@
     "problem_class": "OCP",
     "shared_lib_ext": ".so",
     "solver_options": {
-        "Tsim": 0.1,
+        "Tsim": 0.2,
         "alpha_min": 0.05,
         "alpha_reduction": 0.7,
         "collocation_type": "GAUSS_LEGENDRE",
@@ -11755,21 +11755,11 @@
             0,
             0,
             0,
-            0,
-            0,
-            0,
-            0,
-            0,
             0
         ],
         "sim_method_newton_iter": 3,
         "sim_method_newton_tol": 0.0,
         "sim_method_num_stages": [
-            4,
-            4,
-            4,
-            4,
-            4,
             4,
             4,
             4,
@@ -11781,25 +11771,15 @@
             1,
             1,
             1,
-            1,
-            1,
-            1,
-            1,
-            1,
             1
         ],
         "tf": 1.0,
         "time_steps": [
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
         ]
     },
     "zoro_description": null
